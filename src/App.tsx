@@ -1,6 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { supabase } from './lib/supabase'
+import { format, isSameDay } from 'date-fns'
 import './App.css'
+import type { Shift, ShiftStatus } from './types/shift'
+import { ShiftCalendar } from './components/ShiftCalendar'
+import { ShiftEditModal } from './components/ShiftEditModal'
+import { BulkEditBar } from './components/BulkEditBar'
+import { SelectionBar } from './components/SelectionBar'
 
 type Driver = {
   id: string
@@ -31,16 +37,48 @@ function App() {
     driverRef.current = driver
   }, [driver])
 
-  const [shiftDate, setShiftDate] = useState('')
-  const [availabilityStatus, setAvailabilityStatus] = useState<'ok' | 'ng'>('ok')
-  const [availableFromTime, setAvailableFromTime] = useState('')
-  const [maxJobsPerDay, setMaxJobsPerDay] = useState<0 | 1 | 2>(1)
-  const [note, setNote] = useState('')
-  const [shifts, setShifts] = useState<ShiftAvailability[]>([])
+  const [dbShifts, setDbShifts] = useState<ShiftAvailability[]>([])
+  const [localShifts, setLocalShifts] = useState<Map<string, Shift>>(new Map())
+  const [selectedDates, setSelectedDates] = useState<Date[]>([])
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
 
-  const sortedShifts = useMemo(() => {
-    return [...shifts].sort((a, b) => a.shift_date.localeCompare(b.shift_date))
-  }, [shifts])
+  // DBデータが更新されたらローカル状態にマッピング
+  useEffect(() => {
+    const newMap = new Map<string, Shift>()
+    dbShifts.forEach((s) => {
+      newMap.set(s.shift_date, {
+        date: s.shift_date,
+        status: s.availability_status as ShiftStatus,
+        timeSlot: s.available_from_time || undefined,
+        maxJobs: s.max_jobs_per_day,
+        note: s.note || undefined,
+      })
+    })
+    setLocalShifts(newMap)
+  }, [dbShifts])
+
+  const changesCount = useMemo(() => {
+    let count = 0
+    localShifts.forEach((shift, dateStr) => {
+      const dbObj = dbShifts.find((s) => s.shift_date === dateStr)
+      if (!dbObj) {
+        if (shift.status !== 'none') count++
+      } else {
+        if (
+          dbObj.availability_status !== shift.status ||
+          (dbObj.available_from_time || undefined) !== shift.timeSlot ||
+          dbObj.max_jobs_per_day !== shift.maxJobs ||
+          (dbObj.note || undefined) !== shift.note
+        ) {
+          count++
+        }
+      }
+    })
+    return count
+  }, [localShifts, dbShifts])
+
+  const hasChanges = changesCount > 0
 
   const normalizeAuthHash = () => {
     const hash = window.location.hash
@@ -79,7 +117,7 @@ function App() {
         if (!driverRef.current) {
           setDriver(null)
           setUserEmail(null)
-          setShifts([])
+          setDbShifts([])
         }
         return
       }
@@ -106,7 +144,7 @@ function App() {
         .select('*')
         .eq('driver_id', driverData.id)
 
-      setShifts(shiftData ?? [])
+      setDbShifts(shiftData ?? [])
     } catch (e) {
       console.error(e)
     } finally {
@@ -160,22 +198,78 @@ function App() {
     await supabase.auth.signOut()
     setDriver(null)
     setUserEmail(null)
-    setShifts([])
+    setDbShifts([])
   }
 
-  const handleSubmit = async () => {
-    if (!driver) return
+  const handleToggleDateSelection = (date: Date) => {
+    setSelectedDates((prev) => {
+      const exists = prev.some((d) => isSameDay(d, date))
+      let newDates
+      if (exists) {
+        newDates = prev.filter((d) => !isSameDay(d, date))
+      } else {
+        newDates = [...prev, date]
+      }
+      if (newDates.length === 0) setIsEditModalOpen(false)
+      return newDates
+    })
+  }
 
-    await supabase.from('shift_availability').upsert({
-      driver_id: driver.id,
-      shift_date: shiftDate,
-      availability_status: availabilityStatus,
-      available_from_time: availableFromTime || null,
-      max_jobs_per_day: maxJobsPerDay,
-      note,
+  const handleApplyMultiEdit = (data: {
+    status: ShiftStatus
+    timeSlot?: string
+    maxJobs?: number
+    note?: string
+  }) => {
+    if (selectedDates.length === 0) return
+
+    setLocalShifts((prevMap) => {
+      const newMap = new Map(prevMap)
+      selectedDates.forEach((date) => {
+        const dateStr = format(date, 'yyyy-MM-dd')
+        newMap.set(dateStr, {
+          date: dateStr,
+          ...data,
+        })
+      })
+      return newMap
     })
 
-    fetchData(true)
+    setSelectedDates([]) // Clear selection after applying
+    setIsEditModalOpen(false)
+  }
+
+  const handleBulkSave = async () => {
+    if (!driver) return
+
+    setIsSaving(true)
+    try {
+      // TODO: ここにSupabaseへのBulk Upsertロジックを接続する
+      // 今回は仮実装としてコンソール出力のみ
+      console.log('--- Bulk Save ---')
+      const payload: any[] = []
+      localShifts.forEach((shift) => {
+        // 未入力(none)でも削除などの対応が必要な場合は別途ロジックが必要
+        if (shift.status !== 'none') {
+          payload.push({
+            driver_id: driver.id,
+            shift_date: shift.date,
+            availability_status: shift.status,
+            available_from_time: shift.timeSlot || null,
+            max_jobs_per_day: shift.maxJobs ?? 1,
+            note: shift.note || null,
+          })
+        }
+      })
+      console.log('Payload to upload:', payload)
+      alert(`保存しました！ (${payload.length}件のデータをコンソールに出力しました)`)
+
+      // fetchData(true) // 本来であれば再取得する
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   if (loading) {
@@ -195,32 +289,65 @@ function App() {
 
   return (
     <div style={page}>
-      <h1>Kataren Driver App</h1>
-      <p>{userEmail}</p>
-      {refreshing && <p>更新中...</p>}
-
-      <button onClick={handleLogout}>ログアウト</button>
-
-      <h2>シフト提出</h2>
-      <input type="date" onChange={(e) => setShiftDate(e.target.value)} />
-      <input type="time" onChange={(e) => setAvailableFromTime(e.target.value)} />
-      <button onClick={handleSubmit}>保存</button>
-
-      <h2>一覧</h2>
-      {sortedShifts.map((s) => (
-        <div key={s.id}>
-          {s.shift_date} / {s.available_from_time}
+      <header className="app-header">
+        <h1>シフト入力</h1>
+        <div className="header-actions">
+          <span className="user-email">{userEmail}</span>
+          <button className="logout-btn" onClick={handleLogout}>ログアウト</button>
         </div>
-      ))}
+      </header>
+
+      {refreshing && <p className="hint-text">更新中...</p>}
+
+      <main className="main-content">
+        <p className="hint-text">日付をタップしてシフトを登録してください。複数選択も可能です。</p>
+
+        <ShiftCalendar
+          shifts={localShifts}
+          selectedDates={selectedDates}
+          onToggleDateSelection={handleToggleDateSelection}
+        />
+
+      </main>
+
+      {/* Action Bar for currently selected dates */}
+      <SelectionBar
+        selectedCount={selectedDates.length}
+        onEdit={() => setIsEditModalOpen(true)}
+        onClear={() => {
+          setSelectedDates([])
+          setIsEditModalOpen(false)
+        }}
+      />
+
+      {/* Bottom Sheet that opens when explicitly requested */}
+      <ShiftEditModal
+        isOpen={isEditModalOpen}
+        selectedCount={selectedDates.length}
+        onClose={() => setIsEditModalOpen(false)}
+        onApply={handleApplyMultiEdit}
+      />
+
+      {/* Fixed bottom bar for saving */}
+      <BulkEditBar
+        onSave={handleBulkSave}
+        hasChanges={hasChanges}
+        changesCount={changesCount}
+        isSaving={isSaving}
+      />
     </div>
   )
 }
 
 const page: React.CSSProperties = {
-  padding: 24,
-  color: '#fff',
-  background: '#0b1230',
+  padding: '24px 24px 100px 24px', // bottom padding for BulkEditBar
+  color: '#0f172a',
+  background: '#f8fafc',
   minHeight: '100vh',
+  width: '100%',
+  boxSizing: 'border-box',
+  overflowX: 'hidden',
+  fontFamily: 'system-ui, -apple-system, sans-serif'
 }
 
 export default App

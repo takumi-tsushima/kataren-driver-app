@@ -1,0 +1,18 @@
+export type ShiftStatus = 'ok' | 'ng' | 'none'
+
+export type Shift = {
+    date: string // YYYY-MM-DD
+    status: ShiftStatus
+    timeSlot?: string // e.g. "9:00-12:00", "終日可能"
+    maxJobs?: number
+    note?: string
+}
+
+export type ShiftAvailabilityData = {
+    id: string
+    shift_date: string
+    availability_status: 'ok' | 'ng'
+    available_from_time: string | null
+    max_jobs_per_day: 0 | 1 | 2
+    note: string | null
+}

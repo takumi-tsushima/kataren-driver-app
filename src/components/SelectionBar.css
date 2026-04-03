@@ -1,0 +1,114 @@
+.selection-bar {
+    position: fixed;
+    bottom: 0;
+    /* Show below the modal OR above the save bar? Wait, if save bar is there, we need it above */
+    left: 0;
+    right: 0;
+    padding: 16px 20px;
+    background: #ffffff;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 45;
+    /* above bulk edit bar, below modal */
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    display: flex;
+    justify-content: center;
+}
+
+.selection-bar.visible {
+    transform: translateY(0);
+}
+
+/* Adjust position if BulkEditBar is visible. Actually BulkEditBar handles save, maybe they shouldn't overlap. 
+We can add padding-bottom to selection bar equal to BulkEditBar height if needed, OR just push it up via CSS env or inline styles, 
+but for simplicity we'll just let it overlay or push up via generic spacing.
+Wait, let's make it float like a pill in the bottom center.
+*/
+.selection-bar {
+    bottom: 24px;
+    left: 50%;
+    transform: translate(-50%, 150%);
+    right: auto;
+    width: 90%;
+    max-width: 400px;
+    border-radius: 100px;
+    padding: 12px 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.selection-bar.visible {
+    transform: translate(-50%, 0);
+}
+
+/* If BulkEditBar is open (which is fixed bottom), we might need to let SelectionBar float above it. 
+Since BulkEditBar is at bottom:0, SelectionBar at bottom:24px might clash if BulkEditBar is tall. 
+BulkEditBar has padding 16px 20px + safe-area.
+Let's actually just make SelectionBar sit at bottom 90px if BulkEditBar might be there, or just rely on z-index (SelectionBar on top). The user is selecting days, they should see SelectionBar as primary.
+Let's set bottom: 100px; to be safe, or 32px standard.
+Let's use bottom: 32px; 
+*/
+
+.selection-bar-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.selection-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.count-badge {
+    background: #8b5cf6;
+    color: white;
+    font-size: 14px;
+    font-weight: 700;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.count-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.selection-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.clear-btn {
+    background: transparent;
+    border: none;
+    color: #64748b;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 6px;
+}
+
+.edit-btn {
+    background: #0f172a;
+    color: #ffffff;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
