@@ -7,7 +7,7 @@ import './Home.css'
 
 interface HomeProps {
     shifts: ShiftAvailabilityData[]
-    onNavigate: (page: 'home' | 'shift-submit' | 'admin-shift-table' | 'admin-job-create' | 'admin-draft-jobs' | 'driver-jobs-list') => void
+    onNavigate: (page: 'home' | 'shift-submit' | 'admin-shift-table' | 'admin-job-create' | 'admin-draft-jobs' | 'driver-jobs-list' | 'driver-my-jobs') => void
 }
 
 export const Home: React.FC<HomeProps> = ({ shifts, onNavigate }) => {
@@ -84,12 +84,20 @@ export const Home: React.FC<HomeProps> = ({ shifts, onNavigate }) => {
                     シフトを入力する
                     <ChevronRight size={18} />
                 </button>
-                <button 
-                    className="primary-action-btn" 
+                <button
+                    className="primary-action-btn"
                     onClick={() => onNavigate('driver-jobs-list')}
                     style={{ marginTop: '12px', background: '#3b82f6', color: '#ffffff' }}
                 >
                     募集案件一覧を見る
+                    <ChevronRight size={18} />
+                </button>
+                <button
+                    className="primary-action-btn"
+                    onClick={() => onNavigate('driver-my-jobs')}
+                    style={{ marginTop: '12px', background: '#0d9488', color: '#ffffff' }}
+                >
+                    自分の案件一覧を見る
                     <ChevronRight size={18} />
                 </button>
 

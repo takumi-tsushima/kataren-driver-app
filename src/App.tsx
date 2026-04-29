@@ -22,6 +22,7 @@ import { AdminOpenJobsList } from './components/AdminOpenJobsList'
 import { AdminJobEdit } from './components/AdminJobEdit'
 import { AdminDashboard } from './components/AdminDashboard'
 import { DriverJobsList } from './components/DriverJobsList'
+import { DriverMyJobsList } from './components/DriverMyJobsList'
 import { AdminConfirmedJobsList } from './components/AdminConfirmedJobsList'
 
 export type PageType =
@@ -37,6 +38,7 @@ export type PageType =
   | 'admin-job-edit'
   | 'admin-confirmed-jobs'
   | 'driver-jobs-list'
+  | 'driver-my-jobs'
 
 type UserRole = 'driver' | 'admin'
 
@@ -529,6 +531,38 @@ function App() {
 
           <main className="main-content" style={{ width: '100%' }}>
             <DriverJobsList />
+          </main>
+        </div>
+      </div>
+    )
+  }
+
+  if (pageName === 'driver-my-jobs') {
+    return (
+      <div style={page}>
+        <div className="max-w-md w-full mx-auto">
+          <header className="app-header">
+            <div className="header-actions" style={{ gap: 12 }}>
+              <button
+                className="logout-btn"
+                onClick={() => setPageName('home')}
+                style={{ minWidth: 'auto' }}
+              >
+                ← ホーム
+              </button>
+              <h1 style={{ margin: 0 }}>自分の案件一覧</h1>
+            </div>
+
+            <div className="header-actions">
+              <span className="user-email">{userEmail}</span>
+              <button className="logout-btn" onClick={handleLogout}>
+                ログアウト
+              </button>
+            </div>
+          </header>
+
+          <main className="main-content" style={{ width: '100%' }}>
+            <DriverMyJobsList />
           </main>
         </div>
       </div>

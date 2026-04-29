@@ -45,6 +45,7 @@ type DriverJobDisplayStatus =
     | 'few_left'
     | 'full'
     | 'closed'
+    | 'deadline_passed'
     | 'applied'
     | 'cancelled'
 
@@ -149,7 +150,7 @@ export const DriverJobsList = () => {
 
         if (jobStatus === 'cancelled') return 'cancelled'
         if (hasApplied) return 'applied'
-        if (isDeadlinePassed(rawDeadline)) return 'closed'
+        if (isDeadlinePassed(rawDeadline)) return 'deadline_passed'
         if (remainingSlots <= 0) return 'full'
         if (jobStatus !== 'open') return 'closed'
         if (remainingSlots <= 1) return 'few_left'
@@ -259,7 +260,7 @@ export const DriverJobsList = () => {
                         canApply,
                     } as DriverJob
                 })
-                .filter((job) => job.displayStatus === 'open' || job.displayStatus === 'few_left')
+                .filter((job) => job.displayStatus !== 'cancelled')
 
             setJobs(mapped)
         } catch (err) {
@@ -489,6 +490,12 @@ const DriverJobCard: React.FC<{
                     label: '募集終了',
                     className: 'bg-slate-200 text-slate-700 border-slate-300',
                     icon: <XCircle size={14} />,
+                }
+            case 'deadline_passed':
+                return {
+                    label: '締切超過',
+                    className: 'bg-red-100 text-red-700 border-red-200',
+                    icon: <Clock size={14} />,
                 }
             case 'applied':
                 return {
