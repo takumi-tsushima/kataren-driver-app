@@ -7,10 +7,11 @@ import './Home.css'
 
 interface HomeProps {
     shifts: ShiftAvailabilityData[]
-    onNavigate: (page: 'home' | 'shift-submit' | 'admin-shift-table' | 'admin-job-create' | 'admin-draft-jobs' | 'driver-jobs-list' | 'driver-my-jobs') => void
+    isAdmin: boolean
+    onNavigate: (page: 'home' | 'shift-submit' | 'admin-dashboard' | 'driver-jobs-list' | 'driver-my-jobs') => void
 }
 
-export const Home: React.FC<HomeProps> = ({ shifts, onNavigate }) => {
+export const Home: React.FC<HomeProps> = ({ shifts, isAdmin, onNavigate }) => {
     // Generate next 7 days
     const today = startOfDay(new Date())
     const next7Days = Array.from({ length: 7 }).map((_, i) => addDays(today, i))
@@ -101,26 +102,16 @@ export const Home: React.FC<HomeProps> = ({ shifts, onNavigate }) => {
                     <ChevronRight size={18} />
                 </button>
 
-                <div style={{ marginTop: '16px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {isAdmin && (
                     <button
-                        style={{ border: 'none', background: 'none', color: '#64748b', fontSize: '13px', textDecoration: 'underline', cursor: 'pointer' }}
-                        onClick={() => onNavigate('admin-shift-table')}
+                        className="primary-action-btn"
+                        onClick={() => onNavigate('admin-dashboard')}
+                        style={{ marginTop: '12px', background: '#0f172a', color: '#ffffff' }}
                     >
-                        管理者向けシフト俯瞰画面をプレビュー
+                        管理ダッシュボードを開く
+                        <ChevronRight size={18} />
                     </button>
-                    <button
-                        style={{ border: 'none', background: 'none', color: '#64748b', fontSize: '13px', textDecoration: 'underline', cursor: 'pointer' }}
-                        onClick={() => onNavigate('admin-job-create')}
-                    >
-                        管理者向け案件作成画面をプレビュー
-                    </button>
-                    <button
-                        style={{ border: 'none', background: 'none', color: '#64748b', fontSize: '13px', textDecoration: 'underline', cursor: 'pointer' }}
-                        onClick={() => onNavigate('admin-draft-jobs')}
-                    >
-                        管理者向け下書き案件一覧画面をプレビュー
-                    </button>
-                </div>
+                )}
             </div>
         </div>
     )

@@ -259,6 +259,12 @@ function App() {
     }
   }, [])
 
+  useEffect(() => {
+    if (driver && pageName.startsWith('admin-') && driver.role !== 'admin') {
+      setPageName('home')
+    }
+  }, [pageName, driver?.role])
+
   const handleLogin = async () => {
     try {
       await supabase.auth.signInWithOtp({
@@ -498,7 +504,11 @@ function App() {
           {message && <p className="hint-text">{message}</p>}
 
           <main className="main-content" style={{ width: '100%' }}>
-            <Home shifts={dbShifts} onNavigate={(page) => setPageName(page)} />
+            <Home
+              shifts={dbShifts}
+              isAdmin={driver.role === 'admin'}
+              onNavigate={(page) => setPageName(page)}
+            />
           </main>
         </div>
       </div>
@@ -570,6 +580,9 @@ function App() {
   }
 
   if (pageName.startsWith('admin-')) {
+    if (driver.role !== 'admin') {
+      return null
+    }
     return (
       <div style={page}>
         <div className="max-w-7xl w-full mx-auto">
