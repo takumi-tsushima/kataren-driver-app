@@ -8,6 +8,7 @@ import {
     Loader2,
     CheckCircle2,
     XCircle,
+    Ban,
 } from 'lucide-react'
 import { format, parseISO, startOfDay, isBefore } from 'date-fns'
 import { supabase } from '../lib/supabase'
@@ -29,6 +30,12 @@ type ApplicationWithJobRow = {
 
 type MyJobDisplayStatus = 'scheduled' | 'completed' | 'cancelled'
 
+type CancelApplicationResult = {
+    ok: boolean
+    code?: string
+    message?: string
+}
+
 type MyJob = {
     applicationId: string
     jobId: string
@@ -37,12 +44,16 @@ type MyJob = {
     location: string
     note: string | null
     displayStatus: MyJobDisplayStatus
+    canCancel: boolean
 }
 
 export const DriverMyJobsList = () => {
     const [jobs, setJobs] = useState<MyJob[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const [cancellingId, setCancellingId] = useState<string | null>(null)
+    const [message, setMessage] = useState('')
+    const [messageType, setMessageType] = useState<'success' | 'error' | ''>('')
 
     const formatWorkDate = (value: string) => {
         try {
@@ -127,6 +138,17 @@ export const DriverMyJobsList = () => {
                 .filter((row) => row.job !== null)
                 .map((row) => {
                     const job = row.job as JobRow
+                    const displayStatus = getDisplayStatus(job)
+                    const canCancel = (() => {
+                        if (displayStatus !== 'scheduled') return false
+                        try {
+                            const workStart = startOfDay(parseISO(job.work_date))
+                            const todayStart = startOfDay(new Date())
+                            return isBefore(todayStart, workStart)
+                        } catch {
+                            return false
+                        }
+                    })()
                     return {
                         applicationId: row.id,
                         jobId: job.id,
@@ -134,7 +156,8 @@ export const DriverMyJobsList = () => {
                         rawWorkDate: job.work_date,
                         location: job.location,
                         note: job.note,
-                        displayStatus: getDisplayStatus(job),
+                        displayStatus,
+                        canCancel,
                     }
                 })
                 .sort((a, b) => {
@@ -192,6 +215,47 @@ export const DriverMyJobsList = () => {
         }
     }, [fetchMyJobs])
 
+    const handleCancel = useCallback(
+        async (applicationId: string) => {
+            const ok = window.confirm(
+                'この案件の応募をキャンセルしますか？\nキャンセル後、同じ案件への再応募はできません。'
+            )
+            if (!ok) return
+
+            setCancellingId(applicationId)
+            setMessage('')
+            setMessageType('')
+
+            try {
+                const { data, error: rpcError } = await supabase.rpc('cancel_application', {
+                    p_application_id: applicationId,
+                })
+
+                if (rpcError) throw new Error(rpcError.message)
+
+                const result = data as CancelApplicationResult | null
+
+                if (!result?.ok) {
+                    setMessage(result?.message ?? 'キャンセルに失敗しました。')
+                    setMessageType('error')
+                    await fetchMyJobs({ silent: true })
+                    return
+                }
+
+                setMessage(result.message || '応募をキャンセルしました。')
+                setMessageType('success')
+                await fetchMyJobs({ silent: true })
+            } catch (err) {
+                console.error(err)
+                setMessage(`キャンセルに失敗しました: ${getErrorMessage(err)}`)
+                setMessageType('error')
+            } finally {
+                setCancellingId(null)
+            }
+        },
+        [fetchMyJobs]
+    )
+
     const visibleJobs = useMemo(() => jobs, [jobs])
 
     if (isLoading) {
@@ -237,6 +301,18 @@ export const DriverMyJobsList = () => {
                 <p className="mt-1 text-sm text-slate-600">確定した案件を確認できます。</p>
             </div>
 
+            {message && (
+                <div
+                    className={`mb-4 rounded-xl border p-3.5 font-semibold ${
+                        messageType === 'success'
+                            ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
+                            : 'border-red-100 bg-red-50 text-red-700'
+                    }`}
+                >
+                    {message}
+                </div>
+            )}
+
             {visibleJobs.length === 0 ? (
                 <div className="flex flex-col items-center rounded-2xl border border-slate-200 bg-white p-10 text-center shadow-sm">
                     <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full border border-slate-100 bg-slate-50">
@@ -252,7 +328,12 @@ export const DriverMyJobsList = () => {
             ) : (
                 <div className="grid gap-5">
                     {visibleJobs.map((job) => (
-                        <DriverMyJobCard key={job.applicationId} job={job} />
+                        <DriverMyJobCard
+                            key={job.applicationId}
+                            job={job}
+                            onCancel={handleCancel}
+                            isCancelling={cancellingId === job.applicationId}
+                        />
                     ))}
                 </div>
             )}
@@ -260,7 +341,11 @@ export const DriverMyJobsList = () => {
     )
 }
 
-const DriverMyJobCard: React.FC<{ job: MyJob }> = ({ job }) => {
+const DriverMyJobCard: React.FC<{
+    job: MyJob
+    onCancel: (applicationId: string) => void
+    isCancelling: boolean
+}> = ({ job, onCancel, isCancelling }) => {
     const badge = (() => {
         switch (job.displayStatus) {
             case 'scheduled':
@@ -317,6 +402,18 @@ const DriverMyJobCard: React.FC<{ job: MyJob }> = ({ job }) => {
                             {job.note}
                         </p>
                     </div>
+                )}
+
+                {job.canCancel && (
+                    <button
+                        type="button"
+                        onClick={() => onCancel(job.applicationId)}
+                        disabled={isCancelling}
+                        className="mt-1 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-bold text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        <Ban size={16} />
+                        {isCancelling ? 'キャンセル中...' : '応募をキャンセル'}
+                    </button>
                 )}
             </div>
         </div>
