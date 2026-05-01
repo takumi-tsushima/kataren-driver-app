@@ -87,10 +87,11 @@ function App() {
   }
 
   const isDateLocked = (dateStr: string) => {
+    // 今日から3日後までロック（4日間）。例：今日5/1なら5/1〜5/4ロック、5/5以降編集可
     const today = startOfDay(new Date())
     const target = startOfDay(parseISO(dateStr))
     const diff = differenceInDays(target, today)
-    return diff <= 7
+    return diff < 4
   }
 
   useEffect(() => {
@@ -292,6 +293,13 @@ function App() {
     setEditingJobId(null)
     setEditingDraftJobId(null)
     setPageName('home')
+  }
+
+  const handleEditDateFromHome = (date: Date) => {
+    // ホームの直近7日表示から単日編集を開始
+    setSelectedDates([date])
+    setIsEditModalOpen(true)
+    setPageName('shift-submit')
   }
 
   const handleToggleDateSelection = (date: Date) => {
@@ -508,6 +516,7 @@ function App() {
               shifts={dbShifts}
               isAdmin={driver.role === 'admin'}
               onNavigate={(page) => setPageName(page)}
+              onEditDate={handleEditDateFromHome}
             />
           </main>
         </div>

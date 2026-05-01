@@ -84,6 +84,37 @@
     border: 1px solid #f1f5f9;
 }
 
+button.upcoming-item {
+    width: 100%;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+button.upcoming-item.is-editable:hover {
+    background: #eef2ff;
+    border-color: #c7d2fe;
+}
+
+button.upcoming-item.is-editable:active {
+    background: #e0e7ff;
+}
+
+.upcoming-item.is-locked {
+    background: #f1f5f9;
+}
+
+.row-lock-icon {
+    color: #94a3b8;
+}
+
+.row-edit-chevron {
+    color: #94a3b8;
+    margin-left: 4px;
+}
+
 .date-col {
     display: flex;
     align-items: center;

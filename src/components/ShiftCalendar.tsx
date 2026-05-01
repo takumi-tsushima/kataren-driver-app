@@ -49,9 +49,9 @@ export const ShiftCalendar: React.FC<ShiftCalendarProps> = ({
     const weekDays = ['日', '月', '火', '水', '木', '金', '土']
 
     const isLocked = (date: Date) => {
-        // 過去日〜今日から7日以内はロック
+        // 過去日〜今日から3日後までロック（4日間）。例：今日5/1なら5/1〜5/4ロック、5/5以降編集可
         const diff = differenceInDays(date, today)
-        return diff <= 7
+        return diff < 4
     }
 
     return (
