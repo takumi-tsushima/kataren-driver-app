@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { displayDriverName } from '../lib/driverDisplay'
 import {
     ArrowLeft,
     Ban,
@@ -46,9 +47,6 @@ type DriverRow = {
     id: string
     email?: string | null
     name?: string | null
-    full_name?: string | null
-    display_name?: string | null
-    nickname?: string | null
     [key: string]: unknown
 }
 
@@ -136,13 +134,7 @@ function getStatusClasses(status: string) {
 
 function getDriverName(driver: DriverRow | undefined) {
     if (!driver) return '名前未設定'
-    return (
-        driver.name ||
-        driver.full_name ||
-        driver.display_name ||
-        driver.nickname ||
-        '名前未設定'
-    )
+    return displayDriverName(driver) || '名前未設定'
 }
 
 function getErrorMessage(error: unknown) {
