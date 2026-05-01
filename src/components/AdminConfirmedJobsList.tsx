@@ -231,10 +231,11 @@ export const AdminConfirmedJobsList: React.FC<AdminConfirmedJobsListProps> = ({
 
             const jobsRows = (jobsData ?? []) as JobRow[]
 
-            // 2. 応募取得
+            // 2. 応募取得（confirmed のみ。cancelled は集計・表示から除外）
             const { data: applicationsData, error: applicationsError } = await supabase
                 .from('job_applications')
                 .select('*')
+                .eq('status', 'confirmed')
 
             if (applicationsError) {
                 throw new Error(
