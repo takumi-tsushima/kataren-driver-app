@@ -25,6 +25,7 @@ import { DriverJobsList } from './components/DriverJobsList'
 import { DriverMyJobsList } from './components/DriverMyJobsList'
 import { AdminConfirmedJobsList } from './components/AdminConfirmedJobsList'
 import { ProfileRegister } from './components/ProfileRegister'
+import { displayDriverName } from './lib/driverDisplay'
 
 export type PageType =
   | 'home'
@@ -516,7 +517,7 @@ function App() {
           <header className="app-header">
             <h1>ホーム</h1>
             <div className="header-actions">
-              <span className="user-email">{userEmail}</span>
+              <span className="user-email">{displayDriverName(driver) || userEmail}</span>
               <button className="logout-btn" onClick={handleLogout}>
                 ログアウト
               </button>
@@ -556,7 +557,7 @@ function App() {
             </div>
 
             <div className="header-actions">
-              <span className="user-email">{userEmail}</span>
+              <span className="user-email">{displayDriverName(driver) || userEmail}</span>
               <button className="logout-btn" onClick={handleLogout}>
                 ログアウト
               </button>
@@ -588,7 +589,7 @@ function App() {
             </div>
 
             <div className="header-actions">
-              <span className="user-email">{userEmail}</span>
+              <span className="user-email">{displayDriverName(driver) || userEmail}</span>
               <button className="logout-btn" onClick={handleLogout}>
                 ログアウト
               </button>
@@ -710,7 +711,7 @@ function App() {
           </div>
 
           <div className="header-actions">
-            <span className="user-email">{userEmail}</span>
+            <span className="user-email">{displayDriverName(driver) || userEmail}</span>
             <button className="logout-btn" onClick={handleLogout}>
               ログアウト
             </button>
