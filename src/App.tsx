@@ -24,6 +24,7 @@ import { AdminDashboard } from './components/AdminDashboard'
 import { DriverJobsList } from './components/DriverJobsList'
 import { DriverMyJobsList } from './components/DriverMyJobsList'
 import { AdminConfirmedJobsList } from './components/AdminConfirmedJobsList'
+import { ProfileRegister } from './components/ProfileRegister'
 
 export type PageType =
   | 'home'
@@ -442,6 +443,20 @@ function App() {
 
   if (loading) {
     return <div style={page}>読み込み中...</div>
+  }
+
+  // 名前未登録（NULL or 空文字）はプロフィール登録画面に強制誘導
+  if (driver && !(driver.name && driver.name.trim())) {
+    return (
+      <ProfileRegister
+        driverId={driver.id}
+        email={driver.email}
+        onRegistered={(name) => {
+          setDriver({ ...driver, name })
+          setPageName('home')
+        }}
+      />
+    )
   }
 
   if (!driver) {
