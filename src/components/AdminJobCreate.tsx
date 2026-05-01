@@ -334,9 +334,13 @@ export const AdminJobCreate: React.FC<{
                   required
                 >
                   <option value="" disabled className="text-slate-400">店舗を選択してください</option>
-                  <option value="渋谷本店">渋谷本店</option>
-                  <option value="新宿東口店">新宿東口店</option>
-                  <option value="横浜西口店">横浜西口店</option>
+                  <option value="トヨタレンタカー赤羽駅前店">トヨタレンタカー赤羽駅前店</option>
+                  <option value="トヨタレンタカー練馬駅前店">トヨタレンタカー練馬駅前店</option>
+                  <option value="トヨタレンタカー中野坂上店">トヨタレンタカー中野坂上店</option>
+                  <option value="トヨタレンタカー吾妻橋店">トヨタレンタカー吾妻橋店</option>
+                  <option value="トヨタレンタカー池袋東口店">トヨタレンタカー池袋東口店</option>
+                  <option value="トヨタレンタカー東京駅八重洲口店">トヨタレンタカー東京駅八重洲口店</option>
+                  <option value="トヨタレンタカー成田空港店">トヨタレンタカー成田空港店</option>
                 </select>
               </div>
             </div>
