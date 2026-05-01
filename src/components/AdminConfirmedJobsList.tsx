@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import {
     ArrowLeft,
+    Ban,
     CalendarDays,
     ChevronDown,
     ChevronUp,
@@ -207,6 +208,11 @@ export const AdminConfirmedJobsList: React.FC<AdminConfirmedJobsListProps> = ({
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [expandedJobIds, setExpandedJobIds] = useState<string[]>([])
+    const [removingApplicationId, setRemovingApplicationId] = useState<string | null>(
+        null
+    )
+    const [message, setMessage] = useState('')
+    const [messageType, setMessageType] = useState<'success' | 'error' | ''>('')
 
     const fetchConfirmedJobs = useCallback(async () => {
         setLoading(true)
@@ -345,6 +351,64 @@ export const AdminConfirmedJobsList: React.FC<AdminConfirmedJobsListProps> = ({
         )
     }
 
+    const canRemoveDriver = (rawWorkDate: string | null) => {
+        if (!rawWorkDate) return false
+
+        const today = new Date()
+        const jstToday = new Date(
+            today.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' })
+        )
+
+        const workDate = new Date(rawWorkDate)
+
+        return workDate >= new Date(jstToday.toDateString())
+    }
+
+    const handleRemoveDriver = useCallback(
+        async (applicationId: string, driverName: string) => {
+            const ok = window.confirm(
+                `${driverName} さんをこの案件から外しますか？\nこの操作は取り消せません。`
+            )
+            if (!ok) return
+
+            setRemovingApplicationId(applicationId)
+            setMessage('')
+            setMessageType('')
+
+            try {
+                const { data, error: rpcError } = await supabase.rpc(
+                    'admin_cancel_application',
+                    { p_application_id: applicationId }
+                )
+                if (rpcError) throw new Error(rpcError.message)
+
+                const result = data as {
+                    ok: boolean
+                    code?: string
+                    message?: string
+                } | null
+
+                if (!result?.ok) {
+                    setMessage(result?.message ?? 'キャンセルに失敗しました。')
+                    setMessageType('error')
+                    await fetchConfirmedJobs()
+                    return
+                }
+
+                setMessage(result.message || 'ドライバーを案件から外しました。')
+                setMessageType('success')
+                await fetchConfirmedJobs()
+            } catch (err) {
+                console.error('Failed to remove driver:', err)
+                setMessage(`キャンセルに失敗しました: ${getErrorMessage(err)}`)
+                setMessageType('error')
+            } finally {
+                setRemovingApplicationId(null)
+            }
+        },
+        [fetchConfirmedJobs]
+    )
+
     const totalConfirmedCount = useMemo(() => {
         return jobs.reduce((sum, job) => sum + job.confirmedCount, 0)
     }, [jobs])
@@ -401,6 +465,18 @@ export const AdminConfirmedJobsList: React.FC<AdminConfirmedJobsListProps> = ({
                         </p>
                     </div>
                 </div>
+
+                {message && (
+                    <div
+                        className={`mb-4 rounded-2xl border p-4 text-base font-semibold ${
+                            messageType === 'success'
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                : 'border-rose-200 bg-rose-50 text-rose-700'
+                        }`}
+                    >
+                        {message}
+                    </div>
+                )}
 
                 {loading ? (
                     <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center text-base font-medium text-slate-500 shadow-sm">
@@ -599,6 +675,27 @@ export const AdminConfirmedJobsList: React.FC<AdminConfirmedJobsListProps> = ({
                                                                     </p>
                                                                 </div>
                                                             </div>
+
+                                                            {canRemoveDriver(job.workDate) && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        handleRemoveDriver(
+                                                                            driver.id,
+                                                                            driver.name || 'このドライバー'
+                                                                        )
+                                                                    }
+                                                                    disabled={
+                                                                        removingApplicationId === driver.id
+                                                                    }
+                                                                    className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white px-4 py-2.5 text-sm font-bold text-rose-700 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                                                >
+                                                                    <Ban size={16} />
+                                                                    {removingApplicationId === driver.id
+                                                                        ? '処理中...'
+                                                                        : 'この案件から外す'}
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     ))}
                                                 </div>
