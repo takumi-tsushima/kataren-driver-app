@@ -93,31 +93,44 @@ function formatWorkDate(value: string): string {
   }
 }
 
-// 1案件分のブロック（ヘッダー・区切り線・URL は含まない）
+// 1案件分のブロック（区切り線は含まない）
 type JobBlock = { areaTag: string | null; lines: string[] }
 
-const SEPARATOR = '━━━━━━━━━━━━━━'
-
-// 共通：先着順の注意書き
+// 区切り線：18本（仕様）
+const SEPARATOR = '━━━━━━━━━━━━━━━━━━'
 const FIRST_COME_NOTE = '※先着順のため埋まり次第締切'
+const APPLY_PROMPT = '👉 応募：'
 
-// 共通：応募リンク（ブロック末尾に毎回つける）
-function applyLinkLines(): string[] {
-  return ['', '応募はアプリから:', APP_URL]
+// 店舗名から都市を推定（往復タイトル「東京⇄成田」用）
+function cityFromStore(name: string | null | undefined): string {
+  if (!name) return ''
+  if (name.includes('成田')) return '成田'
+  if (name.includes('名古屋')) return '名古屋'
+  return '東京' // 既存7店舗の残りはすべて東京エリア
+}
+
+function roundTripTitle(out: Job, ret: Job): string {
+  const a = cityFromStore(out.pickup_location)
+  const b = cityFromStore(out.dropoff_location)
+  if (a && b && a !== b) return `往復（${a}⇄${b}）`
+  if (a) return `往復（${a}）`
+  if (b) return `往復（${b}）`
+  return '往復'
 }
 
 function buildSingleBlock(j: Job): JobBlock {
   const tag = j.area_tag ? (AREA_TAG_LABEL[j.area_tag] ?? j.area_tag) : '—'
   const lines = [
-    `【エリア】${tag}`,
-    `【稼働日】${formatWorkDate(j.work_date)}`,
-    `【区間】${routeText(j)}`,
-    `【募集】${j.capacity ?? 1}名`,
-    `【締切】${formatDeadline(j.application_deadline)}`,
+    `【${tag}】`,
+    '',
+    `稼働日:${formatWorkDate(j.work_date)}`,
+    `区間:${routeText(j)}`,
+    `募集:${j.capacity ?? 1}名`,
+    `締切:${formatDeadline(j.application_deadline)}`,
     FIRST_COME_NOTE,
   ]
-  if (j.note && j.note.trim()) lines.push(`【備考】${j.note.trim()}`)
-  lines.push(...applyLinkLines())
+  if (j.note && j.note.trim()) lines.push(`備考:${j.note.trim()}`)
+  lines.push('', `${APPLY_PROMPT}${APP_URL}`)
   return { areaTag: j.area_tag, lines }
 }
 
@@ -130,33 +143,31 @@ function buildRoundTripBlock(legs: Job[]): JobBlock {
   const deadlineOut = formatDeadline(out.application_deadline)
   const deadlineRet = formatDeadline(ret.application_deadline)
   const deadlineLine = deadlineOut === deadlineRet
-    ? `【締切】${deadlineOut}`
-    : `【締切】往路 ${deadlineOut} ／ 復路 ${deadlineRet}`
+    ? `締切:${deadlineOut}`
+    : `締切:往路 ${deadlineOut} ／ 復路 ${deadlineRet}`
   const lines = [
-    '【エリア】往復',
-    `【稼働日】${formatWorkDate(out.work_date)}`,
-    '【区間】',
+    `【${roundTripTitle(out, ret)}】`,
+    '',
+    `稼働日:${formatWorkDate(out.work_date)}`,
+    '区間:',
     `① ${routeText(out)}`,
     `② ${routeText(ret)}`,
-    `【募集】${capacity}名(往復セット)`,
+    `募集:${capacity}名(往復セット)`,
     deadlineLine,
     FIRST_COME_NOTE,
   ]
   const notes: string[] = []
   if (out.note && out.note.trim()) notes.push(`往路 ${out.note.trim()}`)
   if (ret.note && ret.note.trim()) notes.push(`復路 ${ret.note.trim()}`)
-  if (notes.length > 0) lines.push(`【備考】${notes.join(' / ')}`)
-  lines.push(...applyLinkLines())
+  if (notes.length > 0) lines.push(`備考:${notes.join(' / ')}`)
+  lines.push('', `${APPLY_PROMPT}${APP_URL}`)
   return { areaTag: 'round_trip', lines }
 }
 
 // 1チャンネルへの1メッセージ全体を組み立てる
 // 各ブロックは自己完結（応募リンク含む）。隣接ブロック間の区切り線は1本で兼用。
 function renderMessage(blocks: JobBlock[]): string {
-  const out: string[] = []
-  out.push('新規案件のお知らせ')
-  out.push('')
-  out.push(SEPARATOR)
+  const out: string[] = [SEPARATOR]
   for (const b of blocks) {
     for (const line of b.lines) out.push(line)
     out.push(SEPARATOR)
