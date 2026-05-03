@@ -151,6 +151,21 @@ export const AdminDraftJobsList = ({ onNavigateToCreate, onEdit }: Props) => {
 
             setMessage('選択した案件を公開しました。')
             setMessageType('success')
+
+            // Discord通知（fire-and-forget：失敗しても公開フローは止めない）
+            const publishedIds = [...selectedIds]
+            try {
+                const { error: notifyError } = await supabase.functions.invoke(
+                    'notify-job-published',
+                    { body: { job_ids: publishedIds } }
+                )
+                if (notifyError) {
+                    console.warn('Discord通知に失敗（公開自体は成功）:', notifyError)
+                }
+            } catch (notifyErr) {
+                console.warn('Discord通知に失敗（公開自体は成功）:', notifyErr)
+            }
+
             setSelectedIds([])
             await fetchDraftJobs()
         } catch (e) {
