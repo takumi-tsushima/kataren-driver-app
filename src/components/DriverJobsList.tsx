@@ -80,11 +80,41 @@ type ApplyForJobResult = {
     message: string
 }
 
+type RoundTripCard = {
+    kind: 'round_trip'
+    groupId: string
+    legs: [DriverJob, DriverJob]
+    canApplySet: boolean
+    disabledReason: string | null
+}
+
+type DriverCard = { kind: 'single'; job: DriverJob } | RoundTripCard
+
 const ACTIVE_APPLICATION_STATUSES = new Set([
     'confirmed',
     'applied',
     'pending',
 ])
+
+const displayStatusLabel = (status: DriverJobDisplayStatus): string => {
+    switch (status) {
+        case 'full':
+            return '満員'
+        case 'closed':
+            return '募集終了'
+        case 'deadline_passed':
+            return '締切超過'
+        case 'applied':
+            return '応募済み'
+        case 'cancelled':
+            return '停止中'
+        default:
+            return ''
+    }
+}
+
+const isLegApplyable = (leg: DriverJob): boolean =>
+    leg.displayStatus === 'open' || leg.displayStatus === 'few_left'
 
 export const DriverJobsList = () => {
     const [driver, setDriver] = useState<DriverRow | null>(null)
@@ -384,7 +414,124 @@ export const DriverJobsList = () => {
         }
     }
 
-    const visibleJobs = useMemo(() => jobs, [jobs])
+    const handleApplyRoundTrip = async (card: RoundTripCard) => {
+        if (!driver) return
+
+        if (!card.canApplySet) {
+            setMessage(
+                `この往復案件は現在応募できません${card.disabledReason ? `（${card.disabledReason}）` : ''}`
+            )
+            setMessageType('error')
+            return
+        }
+
+        const confirmed = window.confirm(
+            'この往復案件（往路・復路）にまとめて応募しますか？\n応募した時点で2件まとめて確定となります。'
+        )
+        if (!confirmed) return
+
+        setIsApplyingId(card.groupId)
+        setMessage('')
+        setMessageType('')
+
+        try {
+            const { data, error: rpcError } = await supabase.rpc('apply_for_round_trip', {
+                p_group_id: card.groupId,
+                p_driver_id: driver.id,
+            })
+
+            if (rpcError) {
+                throw new Error(rpcError.message)
+            }
+
+            const result = data as ApplyForJobResult | null
+
+            if (!result?.ok) {
+                setMessage(result?.message ?? '応募に失敗しました。')
+                setMessageType('error')
+                await fetchJobs({ silent: true })
+                return
+            }
+
+            setMessage(result.message || '往復案件（往路・復路）に応募しました。')
+            setMessageType('success')
+            await fetchJobs({ silent: true })
+        } catch (err) {
+            console.error(err)
+            setMessage(`応募に失敗しました: ${getErrorMessage(err)}`)
+            setMessageType('error')
+            await fetchJobs({ silent: true })
+        } finally {
+            setIsApplyingId(null)
+        }
+    }
+
+    // group_id ごとに集約してカード化（往復2件 = 1カード、不整合は単独として表示）
+    const visibleCards: DriverCard[] = useMemo(() => {
+        const groupMap = new Map<string, DriverJob[]>()
+        const singles: DriverJob[] = []
+
+        for (const job of jobs) {
+            if (job.group_id) {
+                const arr = groupMap.get(job.group_id) ?? []
+                arr.push(job)
+                groupMap.set(job.group_id, arr)
+            } else {
+                singles.push(job)
+            }
+        }
+
+        const result: DriverCard[] = []
+
+        for (const [groupId, legs] of groupMap) {
+            if (legs.length === 2) {
+                // 安定した順序：id 昇順を「往路 → 復路」として扱う
+                const sorted = [...legs].sort((a, b) => a.id.localeCompare(b.id))
+
+                const canApplySet = isLegApplyable(sorted[0]) && isLegApplyable(sorted[1])
+                let disabledReason: string | null = null
+                if (!canApplySet) {
+                    const reasons: string[] = []
+                    if (!isLegApplyable(sorted[0])) {
+                        const label = displayStatusLabel(sorted[0].displayStatus)
+                        if (label) reasons.push(`往路：${label}`)
+                    }
+                    if (!isLegApplyable(sorted[1])) {
+                        const label = displayStatusLabel(sorted[1].displayStatus)
+                        if (label) reasons.push(`復路：${label}`)
+                    }
+                    disabledReason = reasons.join(' / ') || '応募できない区間があります'
+                }
+
+                result.push({
+                    kind: 'round_trip',
+                    groupId,
+                    legs: [sorted[0], sorted[1]],
+                    canApplySet,
+                    disabledReason,
+                })
+            } else {
+                // 不整合：1件しかなければ片道として表示
+                for (const leg of legs) {
+                    result.push({ kind: 'single', job: leg })
+                }
+            }
+        }
+
+        for (const job of singles) {
+            result.push({ kind: 'single', job })
+        }
+
+        // 全カードを稼働日昇順でソート
+        result.sort((a, b) => {
+            const dateA = a.kind === 'single' ? a.job.rawWorkDate : a.legs[0].rawWorkDate
+            const dateB = b.kind === 'single' ? b.job.rawWorkDate : b.legs[0].rawWorkDate
+            return dateA.localeCompare(dateB)
+        })
+
+        return result
+    }, [jobs])
+
 
     if (isLoading) {
         return (
@@ -442,7 +589,7 @@ export const DriverJobsList = () => {
                 </div>
             )}
 
-            {visibleJobs.length === 0 ? (
+            {visibleCards.length === 0 ? (
                 <div className="flex flex-col items-center rounded-2xl border border-slate-200 bg-white p-10 text-center shadow-sm">
                     <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full border border-slate-100 bg-slate-50">
                         <Briefcase size={36} className="text-slate-400" />
@@ -456,14 +603,26 @@ export const DriverJobsList = () => {
                 </div>
             ) : (
                 <div className="grid gap-5">
-                    {visibleJobs.map((job) => (
-                        <DriverJobCard
-                            key={job.id}
-                            job={job}
-                            isApplying={isApplyingId === job.id}
-                            onApply={() => handleApply(job.id)}
-                        />
-                    ))}
+                    {visibleCards.map((card) => {
+                        if (card.kind === 'round_trip') {
+                            return (
+                                <RoundTripJobCard
+                                    key={`rt-${card.groupId}`}
+                                    card={card}
+                                    isApplying={isApplyingId === card.groupId}
+                                    onApply={() => handleApplyRoundTrip(card)}
+                                />
+                            )
+                        }
+                        return (
+                            <DriverJobCard
+                                key={card.job.id}
+                                job={card.job}
+                                isApplying={isApplyingId === card.job.id}
+                                onApply={() => handleApply(card.job.id)}
+                            />
+                        )
+                    })}
                 </div>
             )}
         </div>
@@ -652,6 +811,172 @@ const DriverJobCard: React.FC<{
                     {!isDisabled && (
                         <div className="absolute inset-0 h-full w-full -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent group-hover:animate-[shimmer_1.5s_infinite]" />
                     )}
+                </button>
+            </div>
+        </div>
+    )
+}
+
+const RoundTripJobCard: React.FC<{
+    card: RoundTripCard
+    onApply: () => void
+    isApplying: boolean
+}> = ({ card, onApply, isApplying }) => {
+    const [out, ret] = card.legs
+    const isDisabled = !card.canApplySet || isApplying
+
+    // 表示用：稼働日は往路のものを優先（通常は同日のはず）
+    const headerDate = out.workDate
+    // 残枠はセット応募で2件確定なので、両レッグの最小値が実質の制約
+    const minRemaining = Math.min(out.remainingSlots, ret.remainingSlots)
+    const isFewLeft = card.canApplySet && minRemaining <= 1
+
+    return (
+        <div
+            className={`overflow-hidden rounded-2xl border bg-white shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] transition-all duration-300 ${
+                isFewLeft ? 'relative border-orange-300' : 'border-violet-200 hover:border-violet-300'
+            }`}
+        >
+            <div
+                className={`flex items-center justify-between border-b px-5 py-4 ${
+                    isFewLeft ? 'border-orange-100 bg-orange-50' : 'border-violet-100 bg-violet-50'
+                }`}
+            >
+                <div className="flex items-center gap-2.5">
+                    <div
+                        className={`rounded-lg p-2 ${
+                            isFewLeft
+                                ? 'bg-orange-100 text-orange-600'
+                                : 'bg-violet-100 text-violet-700 border border-violet-200'
+                        }`}
+                    >
+                        <Calendar size={20} />
+                    </div>
+                    <span className={`text-[19px] font-black ${isFewLeft ? 'text-orange-900' : 'text-violet-900'}`}>
+                        {headerDate}
+                    </span>
+                </div>
+
+                <div className="flex items-center gap-1.5 whitespace-nowrap rounded-full border border-violet-300 bg-white px-3 py-1.5 text-xs font-bold text-violet-700 shadow-sm">
+                    <Repeat size={14} />
+                    往復セット
+                </div>
+            </div>
+
+            <div className="flex flex-col gap-4 p-5">
+                {/* 往路 */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="mb-2 flex items-center gap-2">
+                        <span className="rounded-md bg-violet-600 px-2 py-0.5 text-[11px] font-bold text-white">①</span>
+                        <span className="text-xs font-bold text-violet-700">往路</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                        <MapPin size={16} className="mt-0.5 shrink-0 text-slate-400" />
+                        <span className="text-base font-bold leading-tight text-slate-800">
+                            {formatJobRoute(out)}
+                        </span>
+                    </div>
+                    <div className="mt-2 flex items-center gap-3 text-xs font-bold text-slate-500">
+                        <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1">
+                            残り {out.remainingSlots} / {out.capacity} 枠
+                        </span>
+                        {!isLegApplyable(out) && (
+                            <span className="rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-rose-700">
+                                {displayStatusLabel(out.displayStatus)}
+                            </span>
+                        )}
+                    </div>
+                </div>
+
+                {/* 復路 */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="mb-2 flex items-center gap-2">
+                        <span className="rounded-md bg-violet-600 px-2 py-0.5 text-[11px] font-bold text-white">②</span>
+                        <span className="text-xs font-bold text-violet-700">復路</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                        <MapPin size={16} className="mt-0.5 shrink-0 text-slate-400" />
+                        <span className="text-base font-bold leading-tight text-slate-800">
+                            {formatJobRoute(ret)}
+                        </span>
+                    </div>
+                    <div className="mt-2 flex items-center gap-3 text-xs font-bold text-slate-500">
+                        <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1">
+                            残り {ret.remainingSlots} / {ret.capacity} 枠
+                        </span>
+                        {!isLegApplyable(ret) && (
+                            <span className="rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-rose-700">
+                                {displayStatusLabel(ret.displayStatus)}
+                            </span>
+                        )}
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-3 border-b border-slate-100 pb-4 text-sm font-bold text-slate-600">
+                    <Clock size={18} className="shrink-0 text-slate-400" />
+                    <span className="flex-1 text-slate-500">
+                        締切：往路 {out.deadline} ／ 復路 {ret.deadline}
+                    </span>
+                </div>
+
+                {(out.note || ret.note) && (
+                    <div className="flex flex-col gap-2">
+                        {out.note && (
+                            <div className="flex gap-2.5 rounded-xl border border-amber-100 bg-amber-50 p-3">
+                                <FileText size={16} className="mt-0.5 shrink-0 text-amber-600" />
+                                <p className="m-0 whitespace-pre-wrap text-sm font-medium leading-relaxed text-amber-900">
+                                    <span className="font-bold">往路：</span>
+                                    {out.note}
+                                </p>
+                            </div>
+                        )}
+                        {ret.note && (
+                            <div className="flex gap-2.5 rounded-xl border border-amber-100 bg-amber-50 p-3">
+                                <FileText size={16} className="mt-0.5 shrink-0 text-amber-600" />
+                                <p className="m-0 whitespace-pre-wrap text-sm font-medium leading-relaxed text-amber-900">
+                                    <span className="font-bold">復路：</span>
+                                    {ret.note}
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {!card.canApplySet && card.disabledReason && (
+                    <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-bold text-rose-700">
+                        応募できません（{card.disabledReason}）
+                    </div>
+                )}
+            </div>
+
+            <div className="border-t border-slate-100 bg-slate-50 p-4">
+                <button
+                    className={`group relative w-full overflow-hidden rounded-xl py-4 text-lg font-bold transition-all active:scale-[0.98] ${
+                        isDisabled
+                            ? 'cursor-not-allowed bg-slate-300 text-slate-600 shadow-none'
+                            : 'bg-violet-600 text-white shadow-[0_4px_14px_0_rgba(139,92,246,0.39)] hover:bg-violet-700 hover:shadow-[0_6px_20px_rgba(139,92,246,0.23)]'
+                    }`}
+                    onClick={onApply}
+                    disabled={isDisabled}
+                >
+                    <span className="relative z-10 flex items-center justify-center gap-2">
+                        {isApplying ? (
+                            <>
+                                <Loader2 size={20} className="animate-spin" />
+                                確定処理中...
+                            </>
+                        ) : !card.canApplySet ? (
+                            '現在応募できません'
+                        ) : (
+                            <>
+                                往復セットでまとめて応募する
+                                <ChevronRight
+                                    size={20}
+                                    className="transition-transform group-hover:translate-x-1"
+                                />
+                            </>
+                        )}
+                    </span>
                 </button>
             </div>
         </div>
