@@ -107,29 +107,44 @@ function routeText(j: Job): string {
   return legacy ? formatStoreOne(legacy) : '未設定'
 }
 
+// 締切：M/D HH:MM（JST、24時間制、年なし）
 function formatDeadline(value: string | null): string {
   if (!value) return '指定なし'
   try {
     const d = new Date(value)
-    const fmt = new Intl.DateTimeFormat('ja-JP', {
+    const fmt = new Intl.DateTimeFormat('en-US', {
       timeZone: 'Asia/Tokyo',
-      year: 'numeric', month: '2-digit', day: '2-digit',
+      month: 'numeric', day: 'numeric',
       hour: '2-digit', minute: '2-digit',
+      hour12: false,
     })
-    return fmt.format(d)
+    const parts = fmt.formatToParts(d)
+    let month = '', day = '', hour = '', minute = ''
+    for (const p of parts) {
+      if (p.type === 'month') month = p.value
+      else if (p.type === 'day') day = p.value
+      else if (p.type === 'hour') hour = p.value
+      else if (p.type === 'minute') minute = p.value
+    }
+    return `${month}/${day} ${hour}:${minute}`
   } catch {
     return value
   }
 }
 
+// 稼働日：M/D(曜)（JST）
 function formatWorkDate(value: string): string {
   try {
-    const d = new Date(value + 'T00:00:00+09:00')
-    const fmt = new Intl.DateTimeFormat('ja-JP', {
+    const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (!m) throw new Error('bad date')
+    const month = parseInt(m[2], 10)
+    const day = parseInt(m[3], 10)
+    const dt = new Date(value + 'T00:00:00+09:00')
+    const weekday = new Intl.DateTimeFormat('ja-JP', {
       timeZone: 'Asia/Tokyo',
-      year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short',
-    })
-    return fmt.format(d)
+      weekday: 'short',
+    }).format(dt)
+    return `${month}/${day}(${weekday})`
   } catch {
     return value
   }
@@ -141,7 +156,7 @@ type JobBlock = { areaTag: string | null; lines: string[] }
 // 区切り線：18本（仕様）
 const SEPARATOR = '━━━━━━━━━━━━━━━━━━'
 const FIRST_COME_NOTE = '※先着順のため埋まり次第締切'
-const APPLY_PROMPT = '👉 応募：'
+const APPLY_PROMPT = '👉 '
 
 // 店舗名から都市を推定（往復タイトル「東京⇄成田」用）
 function cityFromStore(name: string | null | undefined): string {
@@ -165,13 +180,14 @@ function buildSingleBlock(j: Job): JobBlock {
   const lines = [
     `【${tag}】`,
     '',
-    `稼働日:${formatWorkDate(j.work_date)}`,
-    `区間:${routeText(j)}`,
-    `募集:${j.capacity ?? 1}名`,
-    `締切:${formatDeadline(j.application_deadline)}`,
+    formatWorkDate(j.work_date),
+    routeText(j),
+    '',
+    `募集：${j.capacity ?? 1}名`,
+    `締切：${formatDeadline(j.application_deadline)}`,
     FIRST_COME_NOTE,
   ]
-  if (j.note && j.note.trim()) lines.push(`備考:${j.note.trim()}`)
+  if (j.note && j.note.trim()) lines.push(`備考：${j.note.trim()}`)
   lines.push('', `${APPLY_PROMPT}${APP_URL}`)
   return { areaTag: j.area_tag, lines }
 }
@@ -185,23 +201,23 @@ function buildRoundTripBlock(legs: Job[]): JobBlock {
   const deadlineOut = formatDeadline(out.application_deadline)
   const deadlineRet = formatDeadline(ret.application_deadline)
   const deadlineLine = deadlineOut === deadlineRet
-    ? `締切:${deadlineOut}`
-    : `締切:往路 ${deadlineOut} ／ 復路 ${deadlineRet}`
+    ? `締切：${deadlineOut}`
+    : `締切：往路 ${deadlineOut} ／ 復路 ${deadlineRet}`
   const lines = [
     `【${roundTripTitle(out, ret)}】`,
     '',
-    `稼働日:${formatWorkDate(out.work_date)}`,
-    '区間:',
-    `① ${routeText(out)}`,
-    `② ${routeText(ret)}`,
-    `募集:${capacity}名(往復セット)`,
+    formatWorkDate(out.work_date),
+    `①${routeText(out)}`,
+    `②${routeText(ret)}`,
+    '',
+    `募集：${capacity}名(往復セット)`,
     deadlineLine,
     FIRST_COME_NOTE,
   ]
   const notes: string[] = []
   if (out.note && out.note.trim()) notes.push(`往路 ${out.note.trim()}`)
   if (ret.note && ret.note.trim()) notes.push(`復路 ${ret.note.trim()}`)
-  if (notes.length > 0) lines.push(`備考:${notes.join(' / ')}`)
+  if (notes.length > 0) lines.push(`備考：${notes.join(' / ')}`)
   lines.push('', `${APPLY_PROMPT}${APP_URL}`)
   return { areaTag: 'round_trip', lines }
 }
