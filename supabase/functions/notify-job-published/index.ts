@@ -98,16 +98,26 @@ type JobBlock = { areaTag: string | null; lines: string[] }
 
 const SEPARATOR = '━━━━━━━━━━━━━━'
 
+// 共通：先着順の注意書き
+const FIRST_COME_NOTE = '※先着順のため埋まり次第締切'
+
+// 共通：応募リンク（ブロック末尾に毎回つける）
+function applyLinkLines(): string[] {
+  return ['', '応募はアプリから:', APP_URL]
+}
+
 function buildSingleBlock(j: Job): JobBlock {
   const tag = j.area_tag ? (AREA_TAG_LABEL[j.area_tag] ?? j.area_tag) : '—'
   const lines = [
-    `📍 ${tag}`,
-    `🗓 ${formatWorkDate(j.work_date)}`,
-    routeText(j),
-    `👤 ${j.capacity ?? 1}名`,
-    `⏰ ${formatDeadline(j.application_deadline)}`,
+    `【エリア】${tag}`,
+    `【稼働日】${formatWorkDate(j.work_date)}`,
+    `【区間】${routeText(j)}`,
+    `【募集】${j.capacity ?? 1}名`,
+    `【締切】${formatDeadline(j.application_deadline)}`,
+    FIRST_COME_NOTE,
   ]
-  if (j.note && j.note.trim()) lines.push(`備考: ${j.note.trim()}`)
+  if (j.note && j.note.trim()) lines.push(`【備考】${j.note.trim()}`)
+  lines.push(...applyLinkLines())
   return { areaTag: j.area_tag, lines }
 }
 
@@ -120,36 +130,37 @@ function buildRoundTripBlock(legs: Job[]): JobBlock {
   const deadlineOut = formatDeadline(out.application_deadline)
   const deadlineRet = formatDeadline(ret.application_deadline)
   const deadlineLine = deadlineOut === deadlineRet
-    ? `⏰ ${deadlineOut}`
-    : `⏰ 往路 ${deadlineOut} ／ 復路 ${deadlineRet}`
+    ? `【締切】${deadlineOut}`
+    : `【締切】往路 ${deadlineOut} ／ 復路 ${deadlineRet}`
   const lines = [
-    '📍 往復',
-    `🗓 ${formatWorkDate(out.work_date)}`,
+    '【エリア】往復',
+    `【稼働日】${formatWorkDate(out.work_date)}`,
+    '【区間】',
     `① ${routeText(out)}`,
     `② ${routeText(ret)}`,
-    `👤 ${capacity}名(往復セット)`,
+    `【募集】${capacity}名(往復セット)`,
     deadlineLine,
+    FIRST_COME_NOTE,
   ]
   const notes: string[] = []
   if (out.note && out.note.trim()) notes.push(`往路 ${out.note.trim()}`)
   if (ret.note && ret.note.trim()) notes.push(`復路 ${ret.note.trim()}`)
-  if (notes.length > 0) lines.push(`備考: ${notes.join(' / ')}`)
+  if (notes.length > 0) lines.push(`【備考】${notes.join(' / ')}`)
+  lines.push(...applyLinkLines())
   return { areaTag: 'round_trip', lines }
 }
 
 // 1チャンネルへの1メッセージ全体を組み立てる
+// 各ブロックは自己完結（応募リンク含む）。隣接ブロック間の区切り線は1本で兼用。
 function renderMessage(blocks: JobBlock[]): string {
   const out: string[] = []
-  out.push('🆕 新規案件のお知らせ')
+  out.push('新規案件のお知らせ')
   out.push('')
   out.push(SEPARATOR)
   for (const b of blocks) {
     for (const line of b.lines) out.push(line)
     out.push(SEPARATOR)
   }
-  out.push('')
-  out.push('応募はアプリから:')
-  out.push(APP_URL)
   return out.join('\n')
 }
 
