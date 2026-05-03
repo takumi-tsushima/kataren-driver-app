@@ -8,6 +8,7 @@ import {
     CalendarDays,
     ChevronDown,
     ChevronUp,
+    Clock,
     MapPin,
     RefreshCw,
     Repeat,
@@ -34,6 +35,7 @@ type JobRow = {
     area_tag?: string | null
     group_id?: string | null
     store?: string | null
+    created_at?: string | null
     [key: string]: unknown
 }
 
@@ -46,6 +48,7 @@ type ApplicationRow = {
     created_at?: string | null
     applied_at?: string | null
     confirmed_at?: string | null
+    selected_time_slot?: string | null
     [key: string]: unknown
 }
 
@@ -62,6 +65,7 @@ type ConfirmedDriver = {
     name: string
     email: string
     confirmedAt: string | null
+    selectedTimeSlot: string | null
 }
 
 type ConfirmedJob = {
@@ -69,6 +73,8 @@ type ConfirmedJob = {
     workDate: string | null
     shopName: string
     isRoundTripJob: boolean
+    /** 往復案件のとき、created_at ASC, id ASC で1件目が outbound、2件目が return。片道は null。 */
+    roundTripLeg: 'outbound' | 'return' | null
     capacity: number
     confirmedCount: number
     remainingCount: number
@@ -300,6 +306,28 @@ export const AdminConfirmedJobsList: React.FC<AdminConfirmedJobsListProps> = ({
                 applicationsByJobId.set(jobId, current)
             }
 
+            // 4-2. 往復セットの「往路 jobs.id」を group_id 単位で決定
+            // 並び順：created_at ASC, id ASC（将来的な順序ズレ防止のため複合キー）
+            const outboundJobIdByGroup = new Map<string, string>()
+            for (const j of jobsRows) {
+                if (!j.group_id) continue
+                const current = outboundJobIdByGroup.get(j.group_id)
+                if (!current) {
+                    outboundJobIdByGroup.set(j.group_id, j.id)
+                    continue
+                }
+                const currentJob = jobsRows.find((x) => x.id === current)
+                const candidateCreatedAt = j.created_at ?? ''
+                const currentCreatedAt = currentJob?.created_at ?? ''
+                // created_at ASC を主、id ASC を副キーにする
+                if (
+                    candidateCreatedAt < currentCreatedAt ||
+                    (candidateCreatedAt === currentCreatedAt && j.id.localeCompare(current) < 0)
+                ) {
+                    outboundJobIdByGroup.set(j.group_id, j.id)
+                }
+            }
+
             // 5. 画面用データへ変換
             const normalizedJobs: ConfirmedJob[] = jobsRows
                 .filter((job) => jobIdsWithApplications.includes(job.id))
@@ -316,17 +344,26 @@ export const AdminConfirmedJobsList: React.FC<AdminConfirmedJobsListProps> = ({
                             name: getDriverName(driver),
                             email: driver?.email ?? '',
                             confirmedAt: getApplicationConfirmedAt(app),
+                            selectedTimeSlot:
+                                (app.selected_time_slot as string | null | undefined) ?? null,
                         }
                     })
 
                     const capacity = getJobCapacity(job)
                     const confirmedCount = confirmedDrivers.length
+                    const isRT = isRoundTrip({ area_tag: job.area_tag ?? null })
+                    const roundTripLeg: 'outbound' | 'return' | null = !isRT
+                        ? null
+                        : job.group_id && outboundJobIdByGroup.get(job.group_id) === job.id
+                            ? 'outbound'
+                            : 'return'
 
                     return {
                         id: job.id,
                         workDate: getJobWorkDate(job),
                         shopName: getJobShopName(job),
-                        isRoundTripJob: isRoundTrip({ area_tag: job.area_tag ?? null }),
+                        isRoundTripJob: isRT,
+                        roundTripLeg,
                         capacity,
                         confirmedCount,
                         remainingCount: Math.max(capacity - confirmedCount, 0),
@@ -534,6 +571,16 @@ export const AdminConfirmedJobsList: React.FC<AdminConfirmedJobsListProps> = ({
                                                         <Repeat size={12} /> 往復
                                                     </span>
                                                 )}
+                                                {job.roundTripLeg === 'outbound' && (
+                                                    <span className="inline-flex items-center rounded-md bg-indigo-100 px-2 py-0.5 text-[11px] font-bold text-indigo-700 border border-indigo-200">
+                                                        往路
+                                                    </span>
+                                                )}
+                                                {job.roundTripLeg === 'return' && (
+                                                    <span className="inline-flex items-center rounded-md bg-teal-100 px-2 py-0.5 text-[11px] font-bold text-teal-700 border border-teal-200">
+                                                        復路
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
 
@@ -685,6 +732,26 @@ export const AdminConfirmedJobsList: React.FC<AdminConfirmedJobsListProps> = ({
                                                                     <p className="mt-1 break-all text-sm font-semibold text-slate-800">
                                                                         {driver.driverId}
                                                                     </p>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
+                                                                <div className="flex items-center gap-2">
+                                                                    <Clock size={14} className="text-slate-500" />
+                                                                    <p className="text-xs font-medium text-slate-500">
+                                                                        対応時間
+                                                                    </p>
+                                                                </div>
+                                                                <div className="mt-1.5">
+                                                                    {driver.selectedTimeSlot ? (
+                                                                        <p className="m-0 text-sm font-bold text-slate-800">
+                                                                            {driver.selectedTimeSlot}
+                                                                        </p>
+                                                                    ) : (
+                                                                        <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-700">
+                                                                            未選択
+                                                                        </span>
+                                                                    )}
                                                                 </div>
                                                             </div>
 
