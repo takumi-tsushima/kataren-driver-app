@@ -1,12 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { format, parseISO } from 'date-fns'
-import { RefreshCw, PlusCircle, Trash2, Edit2, Send, MapPin } from 'lucide-react'
+import { RefreshCw, PlusCircle, Trash2, Edit2, Send, MapPin, Repeat } from 'lucide-react'
+import { formatJobRoute, isRoundTrip } from '../lib/jobLocation'
 
 type JobRow = {
     id: string
     work_date: string
-    location: string
+    location: string | null
+    pickup_location: string | null
+    dropoff_location: string | null
+    area_tag: string | null
+    group_id: string | null
     capacity: number | null
     application_deadline: string | null
     note: string | null
@@ -16,7 +21,11 @@ type JobRow = {
 type DraftJob = {
     id: string
     workDateLabel: string
-    location: string
+    location: string | null
+    pickup_location: string | null
+    dropoff_location: string | null
+    area_tag: string | null
+    group_id: string | null
     capacity: number
     deadlineLabel: string
     note: string | null
@@ -66,7 +75,7 @@ export const AdminDraftJobsList = ({ onNavigateToCreate, onEdit }: Props) => {
         try {
             const { data, error } = await supabase
                 .from('jobs')
-                .select('id, work_date, location, capacity, application_deadline, note, status')
+                .select('id, work_date, location, pickup_location, dropoff_location, area_tag, group_id, capacity, application_deadline, note, status')
                 .eq('status', 'draft')
                 .order('work_date', { ascending: true })
 
@@ -76,6 +85,10 @@ export const AdminDraftJobsList = ({ onNavigateToCreate, onEdit }: Props) => {
                 id: job.id,
                 workDateLabel: formatDateLabel(job.work_date),
                 location: job.location,
+                pickup_location: job.pickup_location,
+                dropoff_location: job.dropoff_location,
+                area_tag: job.area_tag,
+                group_id: job.group_id,
                 capacity: normalizeCapacity(job.capacity),
                 deadlineLabel: formatDateTimeLabel(job.application_deadline),
                 note: job.note,
@@ -273,9 +286,14 @@ export const AdminDraftJobsList = ({ onNavigateToCreate, onEdit }: Props) => {
                                         </div>
                                         <div>
                                             <div className="font-black text-[22px] text-slate-900 leading-none mb-2">{job.workDateLabel}</div>
-                                            <div className="flex items-center gap-1.5 text-slate-600 font-bold text-[15px]">
+                                            <div className="flex flex-wrap items-center gap-1.5 text-slate-600 font-bold text-[15px]">
                                                 <MapPin className="text-slate-400 shrink-0" size={16} />
-                                                {job.location}
+                                                <span>{formatJobRoute(job)}</span>
+                                                {isRoundTrip(job) && (
+                                                    <span className="inline-flex items-center gap-1 rounded-md bg-violet-100 px-2 py-0.5 text-[11px] font-bold text-violet-700 border border-violet-200">
+                                                        <Repeat size={12} /> 往復
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

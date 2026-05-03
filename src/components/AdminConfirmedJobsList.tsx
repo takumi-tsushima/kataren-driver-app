@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { displayDriverName } from '../lib/driverDisplay'
+import { formatJobRoute, isRoundTrip } from '../lib/jobLocation'
 import {
     ArrowLeft,
     Ban,
@@ -9,6 +10,7 @@ import {
     ChevronUp,
     MapPin,
     RefreshCw,
+    Repeat,
     Users,
 } from 'lucide-react'
 
@@ -27,6 +29,10 @@ type JobRow = {
     store_name?: string | null
     location_name?: string | null
     location?: string | null
+    pickup_location?: string | null
+    dropoff_location?: string | null
+    area_tag?: string | null
+    group_id?: string | null
     store?: string | null
     [key: string]: unknown
 }
@@ -62,6 +68,7 @@ type ConfirmedJob = {
     id: string
     workDate: string | null
     shopName: string
+    isRoundTripJob: boolean
     capacity: number
     confirmedCount: number
     remainingCount: number
@@ -171,11 +178,17 @@ function getJobDeadline(job: JobRow): string | null {
 }
 
 function getJobShopName(job: JobRow): string {
+    // 新仕様：pickup → dropoff を表示。既存案件は legacy location にフォールバック
+    const route = formatJobRoute({
+        location: job.location ?? null,
+        pickup_location: job.pickup_location ?? null,
+        dropoff_location: job.dropoff_location ?? null,
+    })
+    if (route) return route
     return (
         job.shop_name ||
         job.store_name ||
         job.location_name ||
-        job.location ||
         job.store ||
         '店舗未設定'
     )
@@ -313,6 +326,7 @@ export const AdminConfirmedJobsList: React.FC<AdminConfirmedJobsListProps> = ({
                         id: job.id,
                         workDate: getJobWorkDate(job),
                         shopName: getJobShopName(job),
+                        isRoundTripJob: isRoundTrip({ area_tag: job.area_tag ?? null }),
                         capacity,
                         confirmedCount,
                         remainingCount: Math.max(capacity - confirmedCount, 0),
@@ -510,11 +524,16 @@ export const AdminConfirmedJobsList: React.FC<AdminConfirmedJobsListProps> = ({
                                             <p className="text-2xl font-bold text-slate-900">
                                                 {formatDate(job.workDate)}
                                             </p>
-                                            <div className="mt-2 flex items-center gap-2 text-slate-600">
+                                            <div className="mt-2 flex flex-wrap items-center gap-2 text-slate-600">
                                                 <MapPin size={16} />
                                                 <span className="text-base font-medium">
                                                     {job.shopName}
                                                 </span>
+                                                {job.isRoundTripJob && (
+                                                    <span className="inline-flex items-center gap-1 rounded-md bg-violet-100 px-2 py-0.5 text-[11px] font-bold text-violet-700 border border-violet-200">
+                                                        <Repeat size={12} /> 往復
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
 

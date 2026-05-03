@@ -12,9 +12,11 @@ import {
     CheckCircle2,
     XCircle,
     Ban,
+    Repeat,
 } from 'lucide-react'
 import { format, isBefore, parseISO } from 'date-fns'
 import { supabase } from '../lib/supabase'
+import { formatJobRoute, isRoundTrip } from '../lib/jobLocation'
 
 type DriverRow = {
     id: string
@@ -25,7 +27,11 @@ type DriverRow = {
 type JobRow = {
     id: string
     work_date: string
-    location: string
+    location: string | null
+    pickup_location: string | null
+    dropoff_location: string | null
+    area_tag: string | null
+    group_id: string | null
     capacity: number | null
     application_deadline: string | null
     note: string | null
@@ -53,7 +59,11 @@ type DriverJob = {
     id: string
     workDate: string
     rawWorkDate: string
-    location: string
+    location: string | null
+    pickup_location: string | null
+    dropoff_location: string | null
+    area_tag: string | null
+    group_id: string | null
     capacity: number
     confirmedCount: number
     remainingSlots: number
@@ -189,7 +199,7 @@ export const DriverJobsList = () => {
 
             const { data: jobsData, error: jobsError } = await supabase
                 .from('jobs')
-                .select('id, work_date, location, capacity, application_deadline, note, status')
+                .select('id, work_date, location, pickup_location, dropoff_location, area_tag, group_id, capacity, application_deadline, note, status')
                 .eq('status', 'open')
                 .order('work_date', { ascending: true })
 
@@ -250,6 +260,10 @@ export const DriverJobsList = () => {
                         workDate: formatWorkDate(job.work_date),
                         rawWorkDate: job.work_date,
                         location: job.location,
+                        pickup_location: job.pickup_location,
+                        dropoff_location: job.dropoff_location,
+                        area_tag: job.area_tag,
+                        group_id: job.group_id,
                         capacity,
                         confirmedCount,
                         remainingSlots,
@@ -554,9 +568,16 @@ const DriverJobCard: React.FC<{
             <div className="flex flex-col gap-4 p-5">
                 <div className="flex items-start gap-3">
                     <MapPin size={18} className="mt-0.5 shrink-0 text-slate-400" />
-                    <span className="text-lg font-bold leading-tight text-slate-800">
-                        {job.location}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-lg font-bold leading-tight text-slate-800">
+                            {formatJobRoute(job)}
+                        </span>
+                        {isRoundTrip(job) && (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-violet-100 px-2 py-0.5 text-[11px] font-bold text-violet-700 border border-violet-200">
+                                <Repeat size={12} /> 往復
+                            </span>
+                        )}
+                    </div>
                 </div>
 
                 <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">

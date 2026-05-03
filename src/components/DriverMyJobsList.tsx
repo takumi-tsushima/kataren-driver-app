@@ -9,14 +9,20 @@ import {
     CheckCircle2,
     XCircle,
     Ban,
+    Repeat,
 } from 'lucide-react'
 import { format, parseISO, startOfDay, isBefore } from 'date-fns'
 import { supabase } from '../lib/supabase'
+import { formatJobRoute, isRoundTrip } from '../lib/jobLocation'
 
 type JobRow = {
     id: string
     work_date: string
-    location: string
+    location: string | null
+    pickup_location: string | null
+    dropoff_location: string | null
+    area_tag: string | null
+    group_id: string | null
     note: string | null
     status: 'draft' | 'open' | 'closed' | 'cancelled' | string
 }
@@ -41,7 +47,11 @@ type MyJob = {
     jobId: string
     workDate: string
     rawWorkDate: string
-    location: string
+    location: string | null
+    pickup_location: string | null
+    dropoff_location: string | null
+    area_tag: string | null
+    group_id: string | null
     note: string | null
     displayStatus: MyJobDisplayStatus
     canCancel: boolean
@@ -123,7 +133,7 @@ export const DriverMyJobsList = () => {
             const { data, error: appError } = await supabase
                 .from('job_applications')
                 .select(
-                    'id, status, created_at, job:jobs(id, work_date, location, note, status)'
+                    'id, status, created_at, job:jobs(id, work_date, location, pickup_location, dropoff_location, area_tag, group_id, note, status)'
                 )
                 .eq('driver_id', driverData.id)
                 .eq('status', 'confirmed')
@@ -155,6 +165,10 @@ export const DriverMyJobsList = () => {
                         workDate: formatWorkDate(job.work_date),
                         rawWorkDate: job.work_date,
                         location: job.location,
+                        pickup_location: job.pickup_location,
+                        dropoff_location: job.dropoff_location,
+                        area_tag: job.area_tag,
+                        group_id: job.group_id,
                         note: job.note,
                         displayStatus,
                         canCancel,
@@ -390,9 +404,16 @@ const DriverMyJobCard: React.FC<{
             <div className="flex flex-col gap-4 p-5">
                 <div className="flex items-start gap-3">
                     <MapPin size={18} className="mt-0.5 shrink-0 text-slate-400" />
-                    <span className="text-lg font-bold leading-tight text-slate-800">
-                        {job.location}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-lg font-bold leading-tight text-slate-800">
+                            {formatJobRoute(job)}
+                        </span>
+                        {isRoundTrip(job) && (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-violet-100 px-2 py-0.5 text-[11px] font-bold text-violet-700 border border-violet-200">
+                                <Repeat size={12} /> 往復
+                            </span>
+                        )}
+                    </div>
                 </div>
 
                 {job.note && (
