@@ -1,14 +1,14 @@
 import React from 'react'
 import { format, addDays, startOfDay, isSameDay, differenceInDays } from 'date-fns'
 import { ja } from 'date-fns/locale'
-import { CalendarDays, AlertCircle, ChevronRight, CheckCircle2, XCircle, Lock } from 'lucide-react'
+import { CalendarDays, AlertCircle, ChevronRight, CheckCircle2, XCircle, Lock, UserCog } from 'lucide-react'
 import type { ShiftAvailabilityData } from '../types/shift'
 import './Home.css'
 
 interface HomeProps {
     shifts: ShiftAvailabilityData[]
     isAdmin: boolean
-    onNavigate: (page: 'home' | 'shift-submit' | 'admin-dashboard' | 'driver-jobs-list' | 'driver-my-jobs') => void
+    onNavigate: (page: 'home' | 'shift-submit' | 'admin-dashboard' | 'driver-jobs-list' | 'driver-my-jobs' | 'profile-edit') => void
     onEditDate: (date: Date) => void
 }
 
@@ -137,6 +137,15 @@ export const Home: React.FC<HomeProps> = ({ shifts, isAdmin, onNavigate, onEditD
                     style={{ marginTop: '12px', background: '#0d9488', color: '#ffffff' }}
                 >
                     自分の案件一覧を見る
+                    <ChevronRight size={18} />
+                </button>
+                <button
+                    className="primary-action-btn"
+                    onClick={() => onNavigate('profile-edit')}
+                    style={{ marginTop: '12px', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1' }}
+                >
+                    <UserCog size={18} style={{ marginRight: 8 }} />
+                    プロフィール編集
                     <ChevronRight size={18} />
                 </button>
 

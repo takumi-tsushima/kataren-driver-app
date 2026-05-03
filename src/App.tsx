@@ -25,12 +25,14 @@ import { DriverJobsList } from './components/DriverJobsList'
 import { DriverMyJobsList } from './components/DriverMyJobsList'
 import { AdminConfirmedJobsList } from './components/AdminConfirmedJobsList'
 import { ProfileRegister } from './components/ProfileRegister'
+import { ProfileEdit } from './components/ProfileEdit'
 import { displayDriverName } from './lib/driverDisplay'
 
 export type PageType =
   | 'home'
   | 'shift-submit'
   | 'login'
+  | 'profile-edit'
   | 'admin-dashboard'
   | 'admin-shift-table'
   | 'admin-job-create'
@@ -566,6 +568,42 @@ function App() {
 
           <main className="main-content" style={{ width: '100%' }}>
             <DriverJobsList onApplied={() => setPageName('driver-my-jobs')} />
+          </main>
+        </div>
+      </div>
+    )
+  }
+
+  if (pageName === 'profile-edit') {
+    return (
+      <div style={page}>
+        <div className="max-w-md w-full mx-auto">
+          <header className="app-header">
+            <div className="header-actions" style={{ gap: 12 }}>
+              <button
+                className="logout-btn"
+                onClick={() => setPageName('home')}
+                style={{ minWidth: 'auto' }}
+              >
+                ← ホーム
+              </button>
+              <h1 style={{ margin: 0 }}>プロフィール</h1>
+            </div>
+
+            <div className="header-actions">
+              <span className="user-email">{displayDriverName(driver) || userEmail}</span>
+              <button className="logout-btn" onClick={handleLogout}>
+                ログアウト
+              </button>
+            </div>
+          </header>
+
+          <main className="main-content" style={{ width: '100%' }}>
+            <ProfileEdit
+              driverId={driver.id}
+              email={userEmail ?? driver.email}
+              onBack={() => setPageName('home')}
+            />
           </main>
         </div>
       </div>
