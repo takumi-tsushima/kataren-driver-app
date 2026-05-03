@@ -26,6 +26,8 @@ import { DriverMyJobsList } from './components/DriverMyJobsList'
 import { AdminConfirmedJobsList } from './components/AdminConfirmedJobsList'
 import { ProfileRegister } from './components/ProfileRegister'
 import { ProfileEdit } from './components/ProfileEdit'
+import { DriverInvoicesList } from './components/DriverInvoicesList'
+import { InvoiceDetail } from './components/InvoiceDetail'
 import { displayDriverName } from './lib/driverDisplay'
 
 export type PageType =
@@ -43,6 +45,8 @@ export type PageType =
   | 'admin-confirmed-jobs'
   | 'driver-jobs-list'
   | 'driver-my-jobs'
+  | 'driver-invoices-list'
+  | 'driver-invoice-detail'
 
 type UserRole = 'driver' | 'admin'
 
@@ -72,6 +76,7 @@ function App() {
   const [pageName, setPageName] = useState<PageType>('home')
   const [editingJobId, setEditingJobId] = useState<string | null>(null)
   const [editingDraftJobId, setEditingDraftJobId] = useState<string | null>(null)
+  const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null)
 
   const driverRef = useRef<Driver | null>(null)
 
@@ -636,6 +641,85 @@ function App() {
 
           <main className="main-content" style={{ width: '100%' }}>
             <DriverMyJobsList />
+          </main>
+        </div>
+      </div>
+    )
+  }
+
+  if (pageName === 'driver-invoices-list') {
+    return (
+      <div style={page}>
+        <div className="max-w-2xl w-full mx-auto">
+          <header className="app-header">
+            <div className="header-actions" style={{ gap: 12 }}>
+              <button
+                className="logout-btn"
+                onClick={() => setPageName('home')}
+                style={{ minWidth: 'auto' }}
+              >
+                ← ホーム
+              </button>
+              <h1 style={{ margin: 0 }}>マイ請求書</h1>
+            </div>
+
+            <div className="header-actions">
+              <span className="user-email">{displayDriverName(driver) || userEmail}</span>
+              <button className="logout-btn" onClick={handleLogout}>
+                ログアウト
+              </button>
+            </div>
+          </header>
+
+          <main className="main-content" style={{ width: '100%' }}>
+            <DriverInvoicesList
+              driverId={driver.id}
+              onOpenInvoice={(id) => {
+                setViewingInvoiceId(id)
+                setPageName('driver-invoice-detail')
+              }}
+            />
+          </main>
+        </div>
+      </div>
+    )
+  }
+
+  if (pageName === 'driver-invoice-detail' && viewingInvoiceId) {
+    return (
+      <div style={page}>
+        <div className="max-w-5xl w-full mx-auto">
+          <header className="app-header print:hidden">
+            <div className="header-actions" style={{ gap: 12 }}>
+              <button
+                className="logout-btn"
+                onClick={() => {
+                  setViewingInvoiceId(null)
+                  setPageName('driver-invoices-list')
+                }}
+                style={{ minWidth: 'auto' }}
+              >
+                ← 一覧
+              </button>
+              <h1 style={{ margin: 0 }}>請求書</h1>
+            </div>
+
+            <div className="header-actions">
+              <span className="user-email">{displayDriverName(driver) || userEmail}</span>
+              <button className="logout-btn" onClick={handleLogout}>
+                ログアウト
+              </button>
+            </div>
+          </header>
+
+          <main className="main-content" style={{ width: '100%' }}>
+            <InvoiceDetail
+              invoiceId={viewingInvoiceId}
+              onBack={() => {
+                setViewingInvoiceId(null)
+                setPageName('driver-invoices-list')
+              }}
+            />
           </main>
         </div>
       </div>
