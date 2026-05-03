@@ -14,6 +14,7 @@ import {
   Briefcase,
   Repeat,
   ArrowRight,
+  JapaneseYen,
 } from 'lucide-react'
 import { AREA_TAG_LABELS, type AreaTag } from '../lib/jobLocation'
 import {
@@ -174,6 +175,8 @@ export const AdminJobCreate: React.FC<{
   const [dropoffLocation, setDropoffLocation] = useState('')
   const [returnPickupLocation, setReturnPickupLocation] = useState('')
   const [returnDropoffLocation, setReturnDropoffLocation] = useState('')
+  const [feePerDriver, setFeePerDriver] = useState<string>('')          // 片道 or 往路の報酬（円・税込）
+  const [returnFeePerDriver, setReturnFeePerDriver] = useState<string>('') // 復路の報酬（円・税込）
   const [headcount, setHeadcount] = useState(1)
   const [deadlineDate, setDeadlineDate] = useState('')
   const [deadlineTime, setDeadlineTime] = useState('23:59')
@@ -219,6 +222,8 @@ export const AdminJobCreate: React.FC<{
     setDropoffLocation('')
     setReturnPickupLocation('')
     setReturnDropoffLocation('')
+    setFeePerDriver('')
+    setReturnFeePerDriver('')
     setHeadcount(1)
     setDeadlineDate('')
     setDeadlineTime('23:59')
@@ -261,6 +266,33 @@ export const AdminJobCreate: React.FC<{
     if (areaTag === 'round_trip') {
       if (!returnPickupLocation || !returnDropoffLocation) {
         setMessage('往復案件は復路の出発店舗・到着店舗も入力してください。')
+        setMessageType('error')
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+        return
+      }
+    }
+
+    // 報酬は新規作成時に必須（片道は1件、往復は往路・復路の2件分）
+    const parsedFee = Number(feePerDriver)
+    if (feePerDriver === '' || !Number.isFinite(parsedFee) || !Number.isInteger(parsedFee) || parsedFee < 0) {
+      setMessage(areaTag === 'round_trip'
+        ? '往路の報酬（円）を0以上の整数で入力してください。'
+        : '報酬（円）を0以上の整数で入力してください。')
+      setMessageType('error')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
+
+    let parsedReturnFee = 0
+    if (areaTag === 'round_trip') {
+      parsedReturnFee = Number(returnFeePerDriver)
+      if (
+        returnFeePerDriver === '' ||
+        !Number.isFinite(parsedReturnFee) ||
+        !Number.isInteger(parsedReturnFee) ||
+        parsedReturnFee < 0
+      ) {
+        setMessage('復路の報酬（円）を0以上の整数で入力してください。')
         setMessageType('error')
         window.scrollTo({ top: 0, behavior: 'smooth' })
         return
@@ -317,6 +349,7 @@ export const AdminJobCreate: React.FC<{
                   dropoff_location: dropoffLocation,
                   // legacy 互換用：location は出発店舗を入れる
                   location: pickupLocation,
+                  fee_per_driver: parsedFee,
                 },
                 {
                   ...baseFields,
@@ -325,6 +358,7 @@ export const AdminJobCreate: React.FC<{
                   pickup_location: returnPickupLocation,
                   dropoff_location: returnDropoffLocation,
                   location: returnPickupLocation,
+                  fee_per_driver: parsedReturnFee,
                 },
               ]
             })()
@@ -336,6 +370,7 @@ export const AdminJobCreate: React.FC<{
                 pickup_location: pickupLocation,
                 dropoff_location: dropoffLocation,
                 location: pickupLocation,
+                fee_per_driver: parsedFee,
               },
             ]
 
@@ -464,6 +499,28 @@ export const AdminJobCreate: React.FC<{
                   {STORE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
+
+              <div className="mt-3 flex flex-col gap-2">
+                <label className="flex items-center gap-2 font-bold text-slate-700 text-sm">
+                  <JapaneseYen size={16} className="text-slate-400" />
+                  報酬（{areaTag === 'round_trip' ? '往路・1名あたり・税込' : '1名あたり・税込'}）
+                  <span className="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded uppercase tracking-wider ml-auto">必須</span>
+                </label>
+                <div className="relative">
+                  <input
+                    className="w-full box-border border border-slate-300 hover:border-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 rounded-xl p-3 pr-10 text-[15px] font-bold bg-white transition-colors"
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    step={1}
+                    placeholder="例: 5000"
+                    value={feePerDriver}
+                    onChange={(e) => setFeePerDriver(e.target.value)}
+                    required
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 font-semibold text-sm">円</span>
+                </div>
+              </div>
             </div>
 
             {/* 復路（往復のみ） */}
@@ -496,6 +553,28 @@ export const AdminJobCreate: React.FC<{
                     <option value="" disabled>到着店舗を選択</option>
                     {STORE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
+                </div>
+
+                <div className="mt-3 flex flex-col gap-2">
+                  <label className="flex items-center gap-2 font-bold text-violet-700 text-sm">
+                    <JapaneseYen size={16} />
+                    報酬（復路・1名あたり・税込）
+                    <span className="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded uppercase tracking-wider ml-auto">必須</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      className="w-full box-border border border-slate-300 hover:border-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 rounded-xl p-3 pr-10 text-[15px] font-bold bg-white transition-colors"
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      step={1}
+                      placeholder="例: 5000"
+                      value={returnFeePerDriver}
+                      onChange={(e) => setReturnFeePerDriver(e.target.value)}
+                      required
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 font-semibold text-sm">円</span>
+                  </div>
                 </div>
               </div>
             )}
