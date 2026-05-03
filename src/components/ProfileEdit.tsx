@@ -217,7 +217,7 @@ export const ProfileEdit: React.FC<ProfileEditProps> = ({ driverId, email, onBac
                 type="text"
                 autoComplete="name"
                 className="w-full box-border border border-slate-300 hover:border-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 rounded-xl p-3 text-sm font-bold bg-white"
-                placeholder="例: 中山 留美"
+                placeholder="例: カタレン 太郎"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 disabled={saving}
@@ -235,7 +235,7 @@ export const ProfileEdit: React.FC<ProfileEditProps> = ({ driverId, email, onBac
                 inputMode="numeric"
                 autoComplete="postal-code"
                 className="w-full box-border border border-slate-300 hover:border-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 rounded-xl p-3 text-sm font-semibold bg-white"
-                placeholder="例: 1700011（ハイフン不要）"
+                placeholder="例: 100-0001（ハイフン任意）"
                 value={postalCode}
                 onChange={(e) => setPostalCode(e.target.value)}
                 disabled={saving}
@@ -252,7 +252,7 @@ export const ProfileEdit: React.FC<ProfileEditProps> = ({ driverId, email, onBac
                 type="text"
                 autoComplete="street-address"
                 className="w-full box-border border border-slate-300 hover:border-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 rounded-xl p-3 text-sm font-semibold bg-white"
-                placeholder="例: 東京都豊島区池袋本町3-28-4"
+                placeholder="例: 東京都千代田区千代田1-1-1-101"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 disabled={saving}
@@ -270,7 +270,7 @@ export const ProfileEdit: React.FC<ProfileEditProps> = ({ driverId, email, onBac
                 inputMode="tel"
                 autoComplete="tel"
                 className="w-full box-border border border-slate-300 hover:border-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 rounded-xl p-3 text-sm font-semibold bg-white"
-                placeholder="例: 08020177860"
+                placeholder="例: 08012345678"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 disabled={saving}
@@ -297,7 +297,7 @@ export const ProfileEdit: React.FC<ProfileEditProps> = ({ driverId, email, onBac
                   id="profile-bank-name"
                   type="text"
                   className="w-full box-border border border-slate-300 hover:border-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 rounded-xl p-3 text-sm font-semibold bg-white"
-                  placeholder="例: みずほ銀行"
+                  placeholder="例: カタレン銀行"
                   value={bankName}
                   onChange={(e) => setBankName(e.target.value)}
                   disabled={saving}
@@ -312,7 +312,7 @@ export const ProfileEdit: React.FC<ProfileEditProps> = ({ driverId, email, onBac
                   id="profile-bank-branch"
                   type="text"
                   className="w-full box-border border border-slate-300 hover:border-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 rounded-xl p-3 text-sm font-semibold bg-white"
-                  placeholder="例: 池袋支店"
+                  placeholder="例: カタレン支店"
                   value={bankBranch}
                   onChange={(e) => setBankBranch(e.target.value)}
                   disabled={saving}
@@ -349,7 +349,7 @@ export const ProfileEdit: React.FC<ProfileEditProps> = ({ driverId, email, onBac
                   type="text"
                   inputMode="numeric"
                   className="w-full box-border border border-slate-300 hover:border-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 rounded-xl p-3 text-sm font-semibold bg-white"
-                  placeholder="例: 2632818"
+                  placeholder="例: 1234567"
                   value={bankAccountNumber}
                   onChange={(e) => setBankAccountNumber(e.target.value)}
                   disabled={saving}
@@ -365,7 +365,7 @@ export const ProfileEdit: React.FC<ProfileEditProps> = ({ driverId, email, onBac
                 id="profile-bank-account-name"
                 type="text"
                 className="w-full box-border border border-slate-300 hover:border-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 rounded-xl p-3 text-sm font-semibold bg-white"
-                placeholder="例: ナカヤマ ルミ"
+                placeholder="例: カタレン タロウ"
                 value={bankAccountName}
                 onChange={(e) => setBankAccountName(e.target.value)}
                 disabled={saving}
