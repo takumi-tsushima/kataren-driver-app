@@ -565,7 +565,7 @@ function App() {
           </header>
 
           <main className="main-content" style={{ width: '100%' }}>
-            <DriverJobsList />
+            <DriverJobsList onApplied={() => setPageName('driver-my-jobs')} />
           </main>
         </div>
       </div>

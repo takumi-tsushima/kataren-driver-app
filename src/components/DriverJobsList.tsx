@@ -116,7 +116,12 @@ const displayStatusLabel = (status: DriverJobDisplayStatus): string => {
 const isLegApplyable = (leg: DriverJob): boolean =>
     leg.displayStatus === 'open' || leg.displayStatus === 'few_left'
 
-export const DriverJobsList = () => {
+type DriverJobsListProps = {
+    /** 応募成功時に呼ばれる。App側で「自分の案件一覧」へ遷移する想定。 */
+    onApplied?: () => void
+}
+
+export const DriverJobsList: React.FC<DriverJobsListProps> = ({ onApplied }) => {
     const [driver, setDriver] = useState<DriverRow | null>(null)
     const [jobs, setJobs] = useState<DriverJob[]>([])
     const [isLoading, setIsLoading] = useState(true)
@@ -404,6 +409,8 @@ export const DriverJobsList = () => {
             setMessage(result.message || '応募が確定しました。')
             setMessageType('success')
             await fetchJobs({ silent: true })
+            // 自分の案件一覧へ自動遷移（時間帯選択UIへ誘導）
+            onApplied?.()
         } catch (err) {
             console.error(err)
             setMessage(`応募に失敗しました: ${getErrorMessage(err)}`)
@@ -456,6 +463,8 @@ export const DriverJobsList = () => {
             setMessage(result.message || '往復案件（往路・復路）に応募しました。')
             setMessageType('success')
             await fetchJobs({ silent: true })
+            // 自分の案件一覧へ自動遷移
+            onApplied?.()
         } catch (err) {
             console.error(err)
             setMessage(`応募に失敗しました: ${getErrorMessage(err)}`)
