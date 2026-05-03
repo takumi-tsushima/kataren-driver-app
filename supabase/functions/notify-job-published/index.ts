@@ -3,9 +3,28 @@
 // - 動作：jobsを取得→group_idで集約→discord_channelsから webhook URL 取得→Discord POST
 // - 失敗：握りつぶす（呼び出し元の公開フローを止めない）
 // - 認証：verify_jwt=true（authenticated ユーザーからのみ呼べる）
+// - CORS：localhost / 本番Vercel から呼べるように preflight 対応
 
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+
+// CORS共通ヘッダー
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+} as const
+
+function jsonResponse(body: unknown, init?: ResponseInit): Response {
+  return new Response(JSON.stringify(body), {
+    ...init,
+    headers: {
+      ...CORS_HEADERS,
+      'Content-Type': 'application/json',
+      ...(init?.headers ?? {}),
+    },
+  })
+}
 
 // 本番アプリURL（通知本文のリンク先）。将来は env var 化を検討
 const APP_URL = 'https://kataren-driver-app.vercel.app/'
@@ -119,38 +138,32 @@ function formatRoundTrip(legs: Job[]): string {
 }
 
 Deno.serve(async (req) => {
+  // CORS preflight：認証もJSONも要らずに即返す
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS_HEADERS })
+  }
+
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ ok: false, code: 'METHOD_NOT_ALLOWED' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return jsonResponse({ ok: false, code: 'METHOD_NOT_ALLOWED' }, { status: 405 })
   }
 
   let body: { job_ids?: string[] }
   try {
     body = await req.json()
   } catch {
-    return new Response(JSON.stringify({ ok: false, code: 'BAD_JSON' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return jsonResponse({ ok: false, code: 'BAD_JSON' }, { status: 400 })
   }
 
   const jobIds = (body.job_ids ?? []).filter((s) => typeof s === 'string')
   if (jobIds.length === 0) {
-    return new Response(JSON.stringify({ ok: true, sent: 0, note: 'no job_ids' }), {
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return jsonResponse({ ok: true, sent: 0, note: 'no job_ids' })
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
   if (!supabaseUrl || !serviceKey) {
     console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
-    return new Response(JSON.stringify({ ok: false, code: 'SERVER_MISCONFIGURED' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return jsonResponse({ ok: false, code: 'SERVER_MISCONFIGURED' }, { status: 500 })
   }
 
   const sb = createClient(supabaseUrl, serviceKey)
@@ -163,17 +176,15 @@ Deno.serve(async (req) => {
 
   if (jobsErr) {
     console.error('jobs fetch failed', jobsErr)
-    return new Response(JSON.stringify({ ok: false, code: 'JOBS_FETCH_FAILED', message: jobsErr.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return jsonResponse(
+      { ok: false, code: 'JOBS_FETCH_FAILED', message: jobsErr.message },
+      { status: 500 }
+    )
   }
 
   const jobs = (jobsData ?? []) as Job[]
   if (jobs.length === 0) {
-    return new Response(JSON.stringify({ ok: true, sent: 0, note: 'no jobs found' }), {
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return jsonResponse({ ok: true, sent: 0, note: 'no jobs found' })
   }
 
   // 2) group_idで集約
@@ -213,10 +224,10 @@ Deno.serve(async (req) => {
 
   if (chErr) {
     console.error('discord_channels fetch failed', chErr)
-    return new Response(JSON.stringify({ ok: false, code: 'CHANNELS_FETCH_FAILED', message: chErr.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return jsonResponse(
+      { ok: false, code: 'CHANNELS_FETCH_FAILED', message: chErr.message },
+      { status: 500 }
+    )
   }
 
   const channels = (channelsData ?? []) as DiscordChannel[]
@@ -254,14 +265,11 @@ Deno.serve(async (req) => {
   const failed = results.filter((r) => !r.ok)
   if (failed.length > 0) console.warn('Discord deliveries failed', failed)
 
-  return new Response(
-    JSON.stringify({
-      ok: true,
-      messages: messages.length,
-      attempted: results.length,
-      sent,
-      failed: failed.length,
-    }),
-    { headers: { 'Content-Type': 'application/json' } }
-  )
+  return jsonResponse({
+    ok: true,
+    messages: messages.length,
+    attempted: results.length,
+    sent,
+    failed: failed.length,
+  })
 })
