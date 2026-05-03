@@ -11,8 +11,11 @@ import {
   ChevronRight,
   List,
   Info,
-  Briefcase
+  Briefcase,
+  Repeat,
+  ArrowRight,
 } from 'lucide-react'
+import { AREA_TAG_LABELS, type AreaTag } from '../lib/jobLocation'
 import {
   format,
   parseISO,
@@ -144,11 +147,33 @@ type DriverRow = {
   name: string | null
 }
 
+const STORE_OPTIONS = [
+  'トヨタレンタカー赤羽駅前店',
+  'トヨタレンタカー練馬駅前店',
+  'トヨタレンタカー中野坂上店',
+  'トヨタレンタカー吾妻橋店',
+  'トヨタレンタカー池袋東口店',
+  'トヨタレンタカー東京駅八重洲口店',
+  'トヨタレンタカー成田空港店',
+] as const
+
+const AREA_TAG_OPTIONS: { value: AreaTag; label: string }[] = [
+  { value: 'tokyo_to_narita', label: AREA_TAG_LABELS.tokyo_to_narita },
+  { value: 'narita_to_tokyo', label: AREA_TAG_LABELS.narita_to_tokyo },
+  { value: 'tokyo_to_nagoya', label: AREA_TAG_LABELS.tokyo_to_nagoya },
+  { value: 'nagoya_to_tokyo', label: AREA_TAG_LABELS.nagoya_to_tokyo },
+  { value: 'round_trip', label: AREA_TAG_LABELS.round_trip },
+]
+
 export const AdminJobCreate: React.FC<{
   onNavigateToDrafts: () => void
 }> = ({ onNavigateToDrafts }) => {
   const [workDate, setWorkDate] = useState('')
-  const [storeName, setStoreName] = useState('')
+  const [areaTag, setAreaTag] = useState<AreaTag | ''>('')
+  const [pickupLocation, setPickupLocation] = useState('')
+  const [dropoffLocation, setDropoffLocation] = useState('')
+  const [returnPickupLocation, setReturnPickupLocation] = useState('')
+  const [returnDropoffLocation, setReturnDropoffLocation] = useState('')
   const [headcount, setHeadcount] = useState(1)
   const [deadlineDate, setDeadlineDate] = useState('')
   const [deadlineTime, setDeadlineTime] = useState('23:59')
@@ -189,11 +214,28 @@ export const AdminJobCreate: React.FC<{
 
   const resetForm = () => {
     setWorkDate('')
-    setStoreName('')
+    setAreaTag('')
+    setPickupLocation('')
+    setDropoffLocation('')
+    setReturnPickupLocation('')
+    setReturnDropoffLocation('')
     setHeadcount(1)
     setDeadlineDate('')
     setDeadlineTime('23:59')
     setNotes('')
+  }
+
+  // 往復選択時：往路の入力を反映して復路にデフォルト値（編集可）
+  const handleAreaTagChange = (next: AreaTag | '') => {
+    setAreaTag(next)
+    if (next === 'round_trip') {
+      if (!returnPickupLocation && dropoffLocation) {
+        setReturnPickupLocation(dropoffLocation)
+      }
+      if (!returnDropoffLocation && pickupLocation) {
+        setReturnDropoffLocation(pickupLocation)
+      }
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -202,11 +244,27 @@ export const AdminJobCreate: React.FC<{
     setMessage('')
     setMessageType('')
 
-    if (!workDate || !deadlineDate || !deadlineTime || !storeName || !headcount) {
+    if (!workDate || !deadlineDate || !deadlineTime || !areaTag || !headcount) {
       setMessage('必須項目を入力してください。')
       setMessageType('error')
       window.scrollTo({ top: 0, behavior: 'smooth' })
       return
+    }
+
+    if (!pickupLocation || !dropoffLocation) {
+      setMessage('出発店舗・到着店舗を入力してください。')
+      setMessageType('error')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
+
+    if (areaTag === 'round_trip') {
+      if (!returnPickupLocation || !returnDropoffLocation) {
+        setMessage('往復案件は復路の出発店舗・到着店舗も入力してください。')
+        setMessageType('error')
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+        return
+      }
     }
 
     if (!currentDriver) {
@@ -237,21 +295,59 @@ export const AdminJobCreate: React.FC<{
     setIsSubmitting(true)
 
     try {
-      const { error } = await supabase.from('jobs').insert([
-        {
-          work_date: workDate,
-          location: storeName,
-          capacity: Number(headcount),
-          application_deadline: deadline.toISOString(),
-          note: notes.trim() || null,
-          status: 'draft',
-          created_by: currentDriver.id,
-        },
-      ])
+      const baseFields = {
+        work_date: workDate,
+        capacity: Number(headcount),
+        application_deadline: deadline.toISOString(),
+        note: notes.trim() || null,
+        status: 'draft',
+        created_by: currentDriver.id,
+      }
+
+      const rows: Array<Record<string, unknown>> =
+        areaTag === 'round_trip'
+          ? (() => {
+              const groupId = crypto.randomUUID()
+              return [
+                {
+                  ...baseFields,
+                  area_tag: 'round_trip',
+                  group_id: groupId,
+                  pickup_location: pickupLocation,
+                  dropoff_location: dropoffLocation,
+                  // legacy 互換用：location は出発店舗を入れる
+                  location: pickupLocation,
+                },
+                {
+                  ...baseFields,
+                  area_tag: 'round_trip',
+                  group_id: groupId,
+                  pickup_location: returnPickupLocation,
+                  dropoff_location: returnDropoffLocation,
+                  location: returnPickupLocation,
+                },
+              ]
+            })()
+          : [
+              {
+                ...baseFields,
+                area_tag: areaTag,
+                group_id: null,
+                pickup_location: pickupLocation,
+                dropoff_location: dropoffLocation,
+                location: pickupLocation,
+              },
+            ]
+
+      const { error } = await supabase.from('jobs').insert(rows)
 
       if (error) throw error
 
-      setMessage('案件を下書き保存しました。')
+      setMessage(
+        areaTag === 'round_trip'
+          ? '往復案件（往路・復路の2件）を下書き保存しました。'
+          : '案件を下書き保存しました。'
+      )
       setMessageType('success')
       window.scrollTo({ top: 0, behavior: 'smooth' })
       resetForm()
@@ -322,28 +418,87 @@ export const AdminJobCreate: React.FC<{
               
               <div className="flex flex-col gap-2">
                 <label className="flex items-center gap-2 font-bold text-slate-700 text-sm">
-                  <MapPin size={16} className="text-slate-400" />
-                  店舗
+                  <Repeat size={16} className="text-slate-400" />
+                  案件種別
                   <span className="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded uppercase tracking-wider ml-auto">必須</span>
                 </label>
                 <select
                   className="w-full box-border border border-slate-300 hover:border-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 rounded-xl p-3.5 text-[15px] font-bold bg-white transition-colors cursor-pointer appearance-none"
-                  value={storeName}
-                  onChange={(e) => setStoreName(e.target.value)}
+                  value={areaTag}
+                  onChange={(e) => handleAreaTagChange(e.target.value as AreaTag | '')}
                   style={{ backgroundImage: 'url("data:image/svg+xml,%3csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3e%3cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3e%3c/svg%3e")', backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}
                   required
                 >
-                  <option value="" disabled className="text-slate-400">店舗を選択してください</option>
-                  <option value="トヨタレンタカー赤羽駅前店">トヨタレンタカー赤羽駅前店</option>
-                  <option value="トヨタレンタカー練馬駅前店">トヨタレンタカー練馬駅前店</option>
-                  <option value="トヨタレンタカー中野坂上店">トヨタレンタカー中野坂上店</option>
-                  <option value="トヨタレンタカー吾妻橋店">トヨタレンタカー吾妻橋店</option>
-                  <option value="トヨタレンタカー池袋東口店">トヨタレンタカー池袋東口店</option>
-                  <option value="トヨタレンタカー東京駅八重洲口店">トヨタレンタカー東京駅八重洲口店</option>
-                  <option value="トヨタレンタカー成田空港店">トヨタレンタカー成田空港店</option>
+                  <option value="" disabled className="text-slate-400">案件種別を選択してください</option>
+                  {AREA_TAG_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
                 </select>
               </div>
             </div>
+
+            {/* 区間入力：往路（または片道） */}
+            <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="mb-3 flex items-center gap-2 font-bold text-slate-700 text-sm">
+                <MapPin size={16} className="text-slate-400" />
+                {areaTag === 'round_trip' ? '往路' : '区間'}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-3 items-center">
+                <select
+                  className="w-full box-border border border-slate-300 hover:border-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 rounded-xl p-3 text-[15px] font-bold bg-white transition-colors cursor-pointer appearance-none"
+                  value={pickupLocation}
+                  onChange={(e) => setPickupLocation(e.target.value)}
+                  required
+                >
+                  <option value="" disabled>出発店舗を選択</option>
+                  {STORE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <ArrowRight size={20} className="text-slate-400 mx-auto hidden md:block" />
+                <select
+                  className="w-full box-border border border-slate-300 hover:border-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 rounded-xl p-3 text-[15px] font-bold bg-white transition-colors cursor-pointer appearance-none"
+                  value={dropoffLocation}
+                  onChange={(e) => setDropoffLocation(e.target.value)}
+                  required
+                >
+                  <option value="" disabled>到着店舗を選択</option>
+                  {STORE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* 復路（往復のみ） */}
+            {areaTag === 'round_trip' && (
+              <div className="mt-3 rounded-xl border border-violet-200 bg-violet-50 p-4">
+                <div className="mb-3 flex items-center gap-2 font-bold text-violet-700 text-sm">
+                  <Repeat size={16} />
+                  復路
+                  <span className="ml-2 text-[11px] font-medium text-violet-600">
+                    （往路の到着＝復路の出発になることが多いです）
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-3 items-center">
+                  <select
+                    className="w-full box-border border border-slate-300 hover:border-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 rounded-xl p-3 text-[15px] font-bold bg-white transition-colors cursor-pointer appearance-none"
+                    value={returnPickupLocation}
+                    onChange={(e) => setReturnPickupLocation(e.target.value)}
+                    required
+                  >
+                    <option value="" disabled>出発店舗を選択</option>
+                    {STORE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <ArrowRight size={20} className="text-slate-400 mx-auto hidden md:block" />
+                  <select
+                    className="w-full box-border border border-slate-300 hover:border-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 rounded-xl p-3 text-[15px] font-bold bg-white transition-colors cursor-pointer appearance-none"
+                    value={returnDropoffLocation}
+                    onChange={(e) => setReturnDropoffLocation(e.target.value)}
+                    required
+                  >
+                    <option value="" disabled>到着店舗を選択</option>
+                    {STORE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
           </section>
 
           {/* Section 2: 募集条件 */}
