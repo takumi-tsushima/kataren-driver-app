@@ -158,6 +158,11 @@ const SEPARATOR = '━━━━━━━━━━━━━━━━━━'
 const FIRST_COME_NOTE = '※先着順のため埋まり次第締切'
 const APPLY_PROMPT = '👉 '
 
+// 通知対象ロール：回送ドライバー
+// allowed_mentions.roles で限定し、@everyone やそれ以外のロールには配信しない
+const DRIVER_ROLE_ID = '1500072642626191440'
+const NOTIFY_HEADER = '🔔新着案件のお知らせ🔔'
+
 // 店舗名から都市を推定（往復タイトル「東京⇄成田」用）
 function cityFromStore(name: string | null | undefined): string {
   if (!name) return ''
@@ -223,9 +228,14 @@ function buildRoundTripBlock(legs: Job[]): JobBlock {
 }
 
 // 1チャンネルへの1メッセージ全体を組み立てる
+// 冒頭に回送ドライバーロールのメンション + 「新着案件のお知らせ」を1度だけ。
 // 各ブロックは自己完結（応募リンク含む）。隣接ブロック間の区切り線は1本で兼用。
 function renderMessage(blocks: JobBlock[]): string {
-  const out: string[] = [SEPARATOR]
+  const out: string[] = []
+  out.push(`<@&${DRIVER_ROLE_ID}>`)
+  out.push(NOTIFY_HEADER)
+  out.push('')
+  out.push(SEPARATOR)
   for (const b of blocks) {
     for (const line of b.lines) out.push(line)
     out.push(SEPARATOR)
@@ -352,7 +362,14 @@ Deno.serve(async (req) => {
       fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({
+          content,
+          // 回送ドライバーロールのみメンション許可。@everyone / @here / 他ロール / ユーザー指定は全て無効。
+          allowed_mentions: {
+            parse: [],
+            roles: [DRIVER_ROLE_ID],
+          },
+        }),
       })
         .then(async (res) => {
           if (!res.ok) {
