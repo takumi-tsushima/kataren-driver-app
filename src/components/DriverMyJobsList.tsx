@@ -584,13 +584,13 @@ const DriverMyJobCard: React.FC<{
                         </div>
 
                         {isReadonlyForReturnLeg ? (
-                            // 往復・復路：表示のみ
+                            // 往復・復路：表示のみ（往路スロット +3時間が自動設定される）
                             <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
                                 {job.selectedTimeSlot ? (
                                     <span>
                                         {job.selectedTimeSlot}
                                         <span className="ml-2 text-xs font-medium text-violet-600">
-                                            （往路と同じ時間）
+                                            （復路の対応時間）
                                         </span>
                                     </span>
                                 ) : (
@@ -619,7 +619,7 @@ const DriverMyJobCard: React.FC<{
                                 </select>
                                 {isRoundTripPair && (
                                     <p className="m-0 text-xs font-medium text-violet-700">
-                                        ※往路で設定した時間が復路にも適用されます
+                                        ※往路で選択した時間に応じて、復路の対応時間が自動設定されます
                                     </p>
                                 )}
                                 {isDirty && (
