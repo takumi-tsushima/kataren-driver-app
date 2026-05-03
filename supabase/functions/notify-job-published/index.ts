@@ -93,23 +93,25 @@ function formatWorkDate(value: string): string {
   }
 }
 
-function formatSingle(j: Job): string {
+// 1案件分のブロック（ヘッダー・区切り線・URL は含まない）
+type JobBlock = { areaTag: string | null; lines: string[] }
+
+const SEPARATOR = '━━━━━━━━━━━━━━'
+
+function buildSingleBlock(j: Job): JobBlock {
   const tag = j.area_tag ? (AREA_TAG_LABEL[j.area_tag] ?? j.area_tag) : '—'
   const lines = [
-    '🆕 新規案件が公開されました',
-    '',
-    `📅 ${formatWorkDate(j.work_date)}`,
-    `📍 ${routeText(j)}`,
-    `🏷 ${tag}`,
-    `👥 募集: ${j.capacity ?? 1}名`,
-    `⏰ 締切: ${formatDeadline(j.application_deadline)}`,
+    `📍 ${tag}`,
+    `🗓 ${formatWorkDate(j.work_date)}`,
+    routeText(j),
+    `👤 ${j.capacity ?? 1}名`,
+    `⏰ ${formatDeadline(j.application_deadline)}`,
   ]
-  if (j.note && j.note.trim()) lines.push(`📝 備考: ${j.note.trim()}`)
-  lines.push('', `応募はアプリから: ${APP_URL}`)
-  return lines.join('\n')
+  if (j.note && j.note.trim()) lines.push(`備考: ${j.note.trim()}`)
+  return { areaTag: j.area_tag, lines }
 }
 
-function formatRoundTrip(legs: Job[]): string {
+function buildRoundTripBlock(legs: Job[]): JobBlock {
   // legs[0] を往路、legs[1] を復路とする（id 昇順で安定化）
   const sorted = [...legs].sort((a, b) => a.id.localeCompare(b.id))
   const out = sorted[0]
@@ -118,23 +120,37 @@ function formatRoundTrip(legs: Job[]): string {
   const deadlineOut = formatDeadline(out.application_deadline)
   const deadlineRet = formatDeadline(ret.application_deadline)
   const deadlineLine = deadlineOut === deadlineRet
-    ? `⏰ 締切: ${deadlineOut}`
-    : `⏰ 締切: 往路 ${deadlineOut} ／ 復路 ${deadlineRet}`
+    ? `⏰ ${deadlineOut}`
+    : `⏰ 往路 ${deadlineOut} ／ 復路 ${deadlineRet}`
   const lines = [
-    '🔁 新規 往復案件が公開されました',
-    '',
-    `📅 ${formatWorkDate(out.work_date)}`,
-    `① 往路: ${routeText(out)}`,
-    `② 復路: ${routeText(ret)}`,
-    `👥 募集: ${capacity}名(往復セット)`,
+    '📍 往復',
+    `🗓 ${formatWorkDate(out.work_date)}`,
+    `① ${routeText(out)}`,
+    `② ${routeText(ret)}`,
+    `👤 ${capacity}名(往復セット)`,
     deadlineLine,
   ]
   const notes: string[] = []
-  if (out.note && out.note.trim()) notes.push(`往路: ${out.note.trim()}`)
-  if (ret.note && ret.note.trim()) notes.push(`復路: ${ret.note.trim()}`)
-  if (notes.length > 0) lines.push(`📝 備考: ${notes.join(' / ')}`)
-  lines.push('', `応募はアプリから: ${APP_URL}`)
-  return lines.join('\n')
+  if (out.note && out.note.trim()) notes.push(`往路 ${out.note.trim()}`)
+  if (ret.note && ret.note.trim()) notes.push(`復路 ${ret.note.trim()}`)
+  if (notes.length > 0) lines.push(`備考: ${notes.join(' / ')}`)
+  return { areaTag: 'round_trip', lines }
+}
+
+// 1チャンネルへの1メッセージ全体を組み立てる
+function renderMessage(blocks: JobBlock[]): string {
+  const out: string[] = []
+  out.push('🆕 新規案件のお知らせ')
+  out.push('')
+  out.push(SEPARATOR)
+  for (const b of blocks) {
+    for (const line of b.lines) out.push(line)
+    out.push(SEPARATOR)
+  }
+  out.push('')
+  out.push('応募はアプリから:')
+  out.push(APP_URL)
+  return out.join('\n')
 }
 
 Deno.serve(async (req) => {
@@ -200,19 +216,17 @@ Deno.serve(async (req) => {
     }
   }
 
-  // 3) 通知メッセージ単位を組み立て（往復は1件、単独・不整合は片道として）
-  const messages: { areaTag: string | null; content: string }[] = []
+  // 3) 案件ブロックを組み立て（往復は1ブロック、単独・不整合は片道として）
+  const blocks: JobBlock[] = []
   for (const j of singles) {
-    messages.push({ areaTag: j.area_tag, content: formatSingle(j) })
+    blocks.push(buildSingleBlock(j))
   }
   for (const [, legs] of groups) {
     if (legs.length === 2) {
-      messages.push({ areaTag: 'round_trip', content: formatRoundTrip(legs) })
+      blocks.push(buildRoundTripBlock(legs))
     } else {
-      // 不整合：片道として個別通知
-      for (const j of legs) {
-        messages.push({ areaTag: j.area_tag, content: formatSingle(j) })
-      }
+      // 不整合：片道として個別ブロック
+      for (const j of legs) blocks.push(buildSingleBlock(j))
     }
   }
 
@@ -234,30 +248,41 @@ Deno.serve(async (req) => {
   const channelMap = new Map<string, string>()
   for (const c of channels) channelMap.set(c.area_tag, c.webhook_url)
 
-  // 5) 各メッセージを target channels（area_tag + 'all'）へ並列配信
-  const sends: Promise<{ ok: boolean; channel: string; status?: number; error?: string }>[] = []
-  for (const m of messages) {
-    const targets = new Set<string>()
-    if (m.areaTag && channelMap.has(m.areaTag)) targets.add(m.areaTag)
-    if (channelMap.has('all')) targets.add('all')
-    for (const t of targets) {
-      const url = channelMap.get(t)!
-      sends.push(
-        fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: m.content }),
-        })
-          .then(async (res) => {
-            if (!res.ok) {
-              const text = await res.text().catch(() => '')
-              return { ok: false, channel: t, status: res.status, error: text.slice(0, 200) }
-            }
-            return { ok: true, channel: t, status: res.status }
-          })
-          .catch((e) => ({ ok: false, channel: t, error: String(e).slice(0, 200) }))
-      )
+  // 5) チャンネル毎にブロックを集約：area_tag のチャンネル + 'all'
+  const channelBlocks = new Map<string, JobBlock[]>()
+  for (const block of blocks) {
+    if (block.areaTag && channelMap.has(block.areaTag)) {
+      const arr = channelBlocks.get(block.areaTag) ?? []
+      arr.push(block)
+      channelBlocks.set(block.areaTag, arr)
     }
+    if (channelMap.has('all')) {
+      const arr = channelBlocks.get('all') ?? []
+      arr.push(block)
+      channelBlocks.set('all', arr)
+    }
+  }
+
+  // 6) チャンネル毎に1メッセージへまとめて並列配信
+  const sends: Promise<{ ok: boolean; channel: string; status?: number; error?: string }>[] = []
+  for (const [areaTag, channelBlockList] of channelBlocks) {
+    const url = channelMap.get(areaTag)!
+    const content = renderMessage(channelBlockList)
+    sends.push(
+      fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      })
+        .then(async (res) => {
+          if (!res.ok) {
+            const text = await res.text().catch(() => '')
+            return { ok: false, channel: areaTag, status: res.status, error: text.slice(0, 200) }
+          }
+          return { ok: true, channel: areaTag, status: res.status }
+        })
+        .catch((e) => ({ ok: false, channel: areaTag, error: String(e).slice(0, 200) }))
+    )
   }
 
   const results = await Promise.all(sends)
@@ -267,7 +292,8 @@ Deno.serve(async (req) => {
 
   return jsonResponse({
     ok: true,
-    messages: messages.length,
+    blocks: blocks.length,
+    channels: channelBlocks.size,
     attempted: results.length,
     sent,
     failed: failed.length,
