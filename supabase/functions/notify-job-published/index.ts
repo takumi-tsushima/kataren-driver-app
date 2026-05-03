@@ -56,13 +56,55 @@ const AREA_TAG_LABEL: Record<string, string> = {
   nagoya_to_tokyo: '名古屋→東京',
 }
 
+// ブランド検出ルール：先頭一致でプレフィックスを剥がし、対応するタグに変換
+// 将来的に他社ブランドを追加する際はこの配列に追加するだけ
+const BRAND_RULES: { prefix: string; tag: string }[] = [
+  { prefix: 'トヨタレンタカー', tag: 'トヨタ' },
+  // 例：{ prefix: 'ニッポンレンタカー', tag: 'ニッポン' },
+  // 例：{ prefix: 'ニコニコレンタカー', tag: 'ニコニコ' },
+]
+
+// 店舗名 → { brand, shortName }
+// 例：「トヨタレンタカー練馬駅前店」→ { brand: 'トヨタ', shortName: '練馬駅前店' }
+// マッチしない店舗名はそのまま（brand 空文字 / shortName 元の値）
+function parseStore(name: string): { brand: string; shortName: string } {
+  const t = name.trim()
+  for (const rule of BRAND_RULES) {
+    if (t.startsWith(rule.prefix)) {
+      return { brand: rule.tag, shortName: t.slice(rule.prefix.length) }
+    }
+  }
+  return { brand: '', shortName: t }
+}
+
+// 店舗1件の表示：[ブランド] 店舗名（ブランド未検出ならタグ無し）
+function formatStoreOne(name: string): string {
+  const { brand, shortName } = parseStore(name)
+  return brand ? `[${brand}] ${shortName}` : shortName
+}
+
+// 区間（出発→到着）の表示
+// - 両方同じブランド：先頭にタグ1つだけ → 「[トヨタ] 練馬駅前店 → 成田空港店」
+// - 異ブランド or 片方のみブランド：両側に個別タグ
+function formatStorePair(pickup: string, dropoff: string): string {
+  const p = parseStore(pickup)
+  const d = parseStore(dropoff)
+  if (p.brand && p.brand === d.brand) {
+    return `[${p.brand}] ${p.shortName} → ${d.shortName}`
+  }
+  const lhs = p.brand ? `[${p.brand}] ${p.shortName}` : p.shortName
+  const rhs = d.brand ? `[${d.brand}] ${d.shortName}` : d.shortName
+  return `${lhs} → ${rhs}`
+}
+
 function routeText(j: Job): string {
   const p = (j.pickup_location ?? '').trim()
   const d = (j.dropoff_location ?? '').trim()
-  if (p && d) return `${p} → ${d}`
-  if (p) return p
-  if (d) return d
-  return j.location ?? '未設定'
+  if (p && d) return formatStorePair(p, d)
+  if (p) return formatStoreOne(p)
+  if (d) return formatStoreOne(d)
+  const legacy = (j.location ?? '').trim()
+  return legacy ? formatStoreOne(legacy) : '未設定'
 }
 
 function formatDeadline(value: string | null): string {
