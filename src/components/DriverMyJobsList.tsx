@@ -10,6 +10,10 @@ import {
     XCircle,
     Ban,
     Repeat,
+    Clock,
+    AlertTriangle,
+    Save,
+    Check,
 } from 'lucide-react'
 import { format, parseISO, startOfDay, isBefore } from 'date-fns'
 import { supabase } from '../lib/supabase'
@@ -31,8 +35,21 @@ type ApplicationWithJobRow = {
     id: string
     status: string | null
     created_at: string
+    selected_time_slot: string | null
     job: JobRow | null
 }
+
+// 時間帯の選択肢
+const TIME_SLOTS_ALL = [
+    '9:00-12:00', '10:00-13:00', '11:00-14:00', '12:00-15:00', '13:00-16:00',
+    '14:00-17:00', '15:00-18:00', '16:00-19:00', '17:00-20:00',
+] as const
+
+const TIME_SLOTS_ROUND_TRIP = [
+    '9:00-12:00', '10:00-13:00', '11:00-14:00', '12:00-15:00', '13:00-16:00', '14:00-17:00',
+] as const
+
+type TimeSlotResult = { ok: boolean; code?: string; message?: string }
 
 type MyJobDisplayStatus = 'scheduled' | 'completed' | 'cancelled'
 
@@ -55,6 +72,9 @@ type MyJob = {
     note: string | null
     displayStatus: MyJobDisplayStatus
     canCancel: boolean
+    selectedTimeSlot: string | null
+    /** 往復セットの「往路」(編集側) なら true。片道は常に true。復路は false。 */
+    isRoundTripPrimary: boolean
 }
 
 export const DriverMyJobsList = () => {
@@ -64,6 +84,10 @@ export const DriverMyJobsList = () => {
     const [cancellingId, setCancellingId] = useState<string | null>(null)
     const [message, setMessage] = useState('')
     const [messageType, setMessageType] = useState<'success' | 'error' | ''>('')
+    // 時間帯選択：未保存ドラフト / 保存中 / 成功フィードバック
+    const [draftSlots, setDraftSlots] = useState<Record<string, string>>({})
+    const [savingTimeSlotId, setSavingTimeSlotId] = useState<string | null>(null)
+    const [savedFlashId, setSavedFlashId] = useState<string | null>(null)
 
     const formatWorkDate = (value: string) => {
         try {
@@ -133,7 +157,7 @@ export const DriverMyJobsList = () => {
             const { data, error: appError } = await supabase
                 .from('job_applications')
                 .select(
-                    'id, status, created_at, job:jobs(id, work_date, location, pickup_location, dropoff_location, area_tag, group_id, note, status)'
+                    'id, status, created_at, selected_time_slot, job:jobs(id, work_date, location, pickup_location, dropoff_location, area_tag, group_id, note, status)'
                 )
                 .eq('driver_id', driverData.id)
                 .eq('status', 'confirmed')
@@ -143,6 +167,16 @@ export const DriverMyJobsList = () => {
             const rows = (data ?? []) as unknown as ApplicationWithJobRow[]
 
             const today = startOfDay(new Date()).getTime()
+
+            // 往復セットの「往路」(編集側) を group_id ごとに決定：jobId 昇順で最初の応募
+            const primaryByGroup = new Map<string, string>()
+            for (const row of rows) {
+                if (!row.job?.group_id) continue
+                const current = primaryByGroup.get(row.job.group_id)
+                if (!current || row.job.id.localeCompare(current) < 0) {
+                    primaryByGroup.set(row.job.group_id, row.job.id)
+                }
+            }
 
             const mapped: MyJob[] = rows
                 .filter((row) => row.job !== null)
@@ -159,6 +193,9 @@ export const DriverMyJobsList = () => {
                             return false
                         }
                     })()
+                    const isRoundTripPrimary = job.group_id
+                        ? primaryByGroup.get(job.group_id) === job.id
+                        : true
                     return {
                         applicationId: row.id,
                         jobId: job.id,
@@ -172,6 +209,8 @@ export const DriverMyJobsList = () => {
                         note: job.note,
                         displayStatus,
                         canCancel,
+                        selectedTimeSlot: row.selected_time_slot,
+                        isRoundTripPrimary,
                     }
                 })
                 .sort((a, b) => {
@@ -270,6 +309,68 @@ export const DriverMyJobsList = () => {
         [fetchMyJobs]
     )
 
+    const handleChangeTimeSlot = useCallback((applicationId: string, slot: string) => {
+        setDraftSlots((prev) => ({ ...prev, [applicationId]: slot }))
+    }, [])
+
+    const handleSaveTimeSlot = useCallback(
+        async (job: MyJob) => {
+            const draft = draftSlots[job.applicationId]
+            if (!draft || draft === job.selectedTimeSlot) return
+
+            setSavingTimeSlotId(job.applicationId)
+            setMessage('')
+            setMessageType('')
+
+            try {
+                let result: TimeSlotResult | null
+                if (job.area_tag === 'round_trip' && job.group_id) {
+                    const { data, error: rpcError } = await supabase.rpc(
+                        'set_round_trip_time_slot',
+                        { p_group_id: job.group_id, p_time_slot: draft }
+                    )
+                    if (rpcError) throw new Error(rpcError.message)
+                    result = data as TimeSlotResult | null
+                } else {
+                    const { data, error: rpcError } = await supabase.rpc(
+                        'set_application_time_slot',
+                        { p_application_id: job.applicationId, p_time_slot: draft }
+                    )
+                    if (rpcError) throw new Error(rpcError.message)
+                    result = data as TimeSlotResult | null
+                }
+
+                if (!result?.ok) {
+                    setMessage(result?.message ?? '時間帯の保存に失敗しました。')
+                    setMessageType('error')
+                    return
+                }
+
+                // ドラフト破棄＋成功フラッシュ
+                setDraftSlots((prev) => {
+                    const next = { ...prev }
+                    delete next[job.applicationId]
+                    return next
+                })
+                setSavedFlashId(job.applicationId)
+                window.setTimeout(() => {
+                    setSavedFlashId((current) =>
+                        current === job.applicationId ? null : current
+                    )
+                }, 2500)
+
+                await fetchMyJobs({ silent: true })
+            } catch (err) {
+                console.error(err)
+                setMessage(`時間帯の保存に失敗しました: ${getErrorMessage(err)}`)
+                setMessageType('error')
+            } finally {
+                setSavingTimeSlotId(null)
+            }
+        },
+        [draftSlots, fetchMyJobs]
+    )
+
     const visibleJobs = useMemo(() => jobs, [jobs])
 
     if (isLoading) {
@@ -347,6 +448,13 @@ export const DriverMyJobsList = () => {
                             job={job}
                             onCancel={handleCancel}
                             isCancelling={cancellingId === job.applicationId}
+                            draftTimeSlot={draftSlots[job.applicationId] ?? null}
+                            onChangeTimeSlot={(slot) =>
+                                handleChangeTimeSlot(job.applicationId, slot)
+                            }
+                            onSaveTimeSlot={() => handleSaveTimeSlot(job)}
+                            isSavingTimeSlot={savingTimeSlotId === job.applicationId}
+                            showTimeSlotSavedFlash={savedFlashId === job.applicationId}
                         />
                     ))}
                 </div>
@@ -359,7 +467,21 @@ const DriverMyJobCard: React.FC<{
     job: MyJob
     onCancel: (applicationId: string) => void
     isCancelling: boolean
-}> = ({ job, onCancel, isCancelling }) => {
+    draftTimeSlot: string | null
+    onChangeTimeSlot: (slot: string) => void
+    onSaveTimeSlot: () => void
+    isSavingTimeSlot: boolean
+    showTimeSlotSavedFlash: boolean
+}> = ({
+    job,
+    onCancel,
+    isCancelling,
+    draftTimeSlot,
+    onChangeTimeSlot,
+    onSaveTimeSlot,
+    isSavingTimeSlot,
+    showTimeSlotSavedFlash,
+}) => {
     const badge = (() => {
         switch (job.displayStatus) {
             case 'scheduled':
@@ -382,6 +504,16 @@ const DriverMyJobCard: React.FC<{
                 }
         }
     })()
+
+    // 時間帯選択UI制御
+    const isRoundTripPair = job.area_tag === 'round_trip' && !!job.group_id
+    const isReadonlyForReturnLeg = isRoundTripPair && !job.isRoundTripPrimary
+    const slotOptions = isRoundTripPair ? TIME_SLOTS_ROUND_TRIP : TIME_SLOTS_ALL
+    const currentSlot = draftTimeSlot ?? job.selectedTimeSlot ?? ''
+    const isDirty =
+        draftTimeSlot !== null && draftTimeSlot !== '' && draftTimeSlot !== job.selectedTimeSlot
+    // 確定中（scheduled）の案件にのみ時間帯セレクタを出す
+    const showTimeSlotSection = job.displayStatus === 'scheduled'
 
     return (
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)]">
@@ -422,6 +554,96 @@ const DriverMyJobCard: React.FC<{
                         <p className="m-0 whitespace-pre-wrap text-sm font-medium leading-relaxed text-amber-900">
                             {job.note}
                         </p>
+                    </div>
+                )}
+
+                {showTimeSlotSection && (
+                    <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                                <Clock size={16} className="text-slate-500" />
+                                対応可能時間
+                                {isRoundTripPair && (
+                                    <span className="ml-1 inline-flex items-center gap-1 rounded-md bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-700 border border-violet-200">
+                                        <Repeat size={10} /> 往復セット
+                                    </span>
+                                )}
+                            </div>
+                            {!job.selectedTimeSlot && !showTimeSlotSavedFlash && (
+                                <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                                    <AlertTriangle size={11} />
+                                    未選択
+                                </span>
+                            )}
+                            {showTimeSlotSavedFlash && (
+                                <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                                    <Check size={11} />
+                                    保存しました
+                                </span>
+                            )}
+                        </div>
+
+                        {isReadonlyForReturnLeg ? (
+                            // 往復・復路：表示のみ
+                            <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
+                                {job.selectedTimeSlot ? (
+                                    <span>
+                                        {job.selectedTimeSlot}
+                                        <span className="ml-2 text-xs font-medium text-violet-600">
+                                            （往路と同じ時間）
+                                        </span>
+                                    </span>
+                                ) : (
+                                    <span className="text-slate-500">
+                                        未選択（往路カードで設定してください）
+                                    </span>
+                                )}
+                            </div>
+                        ) : (
+                            // 片道 or 往復・往路：編集可能
+                            <>
+                                <select
+                                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-800 focus:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                                    value={currentSlot}
+                                    onChange={(e) => onChangeTimeSlot(e.target.value)}
+                                    disabled={isSavingTimeSlot}
+                                >
+                                    <option value="" disabled>
+                                        時間帯を選択
+                                    </option>
+                                    {slotOptions.map((s) => (
+                                        <option key={s} value={s}>
+                                            {s}
+                                        </option>
+                                    ))}
+                                </select>
+                                {isRoundTripPair && (
+                                    <p className="m-0 text-xs font-medium text-violet-700">
+                                        ※往路で設定した時間が復路にも適用されます
+                                    </p>
+                                )}
+                                {isDirty && (
+                                    <button
+                                        type="button"
+                                        onClick={onSaveTimeSlot}
+                                        disabled={isSavingTimeSlot}
+                                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        {isSavingTimeSlot ? (
+                                            <>
+                                                <Loader2 size={14} className="animate-spin" />
+                                                保存中...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Save size={14} />
+                                                時間帯を保存
+                                            </>
+                                        )}
+                                    </button>
+                                )}
+                            </>
+                        )}
                     </div>
                 )}
 
