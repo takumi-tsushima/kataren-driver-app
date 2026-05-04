@@ -4,11 +4,13 @@ import { displayDriverName } from '../lib/driverDisplay'
 import { formatJobRoute, isRoundTrip } from '../lib/jobLocation'
 import {
     ArrowLeft,
+    ArrowRight,
     Ban,
     CalendarDays,
     ChevronDown,
     ChevronUp,
     Clock,
+    ListChecks,
     MapPin,
     RefreshCw,
     Repeat,
@@ -85,6 +87,7 @@ type ConfirmedJob = {
 
 interface AdminConfirmedJobsListProps {
     onBack: () => void
+    onNavigateToCompletedJobs?: () => void
 }
 
 function formatDate(value: string | null) {
@@ -214,6 +217,7 @@ function getApplicationConfirmedAt(app: ApplicationRow): string | null {
 
 export const AdminConfirmedJobsList: React.FC<AdminConfirmedJobsListProps> = ({
     onBack,
+    onNavigateToCompletedJobs,
 }) => {
     const [jobs, setJobs] = useState<ConfirmedJob[]>([])
     const [loading, setLoading] = useState(true)
@@ -479,14 +483,27 @@ export const AdminConfirmedJobsList: React.FC<AdminConfirmedJobsListProps> = ({
                         </p>
                     </div>
 
-                    <button
-                        type="button"
-                        onClick={fetchConfirmedJobs}
-                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-base font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100"
-                    >
-                        <RefreshCw size={18} />
-                        再読み込み
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                        {onNavigateToCompletedJobs && (
+                            <button
+                                type="button"
+                                onClick={onNavigateToCompletedJobs}
+                                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-violet-300 bg-violet-50 px-5 py-3 text-base font-semibold text-violet-700 shadow-sm transition hover:bg-violet-100"
+                            >
+                                <ListChecks size={18} />
+                                実績一覧を見る
+                                <ArrowRight size={16} />
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            onClick={fetchConfirmedJobs}
+                            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-base font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100"
+                        >
+                            <RefreshCw size={18} />
+                            再読み込み
+                        </button>
+                    </div>
                 </div>
 
                 <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">

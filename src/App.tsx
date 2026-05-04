@@ -30,6 +30,7 @@ import { DriverInvoicesList } from './components/DriverInvoicesList'
 import { DriverInvoiceCreate } from './components/DriverInvoiceCreate'
 import { InvoiceDetail } from './components/InvoiceDetail'
 import { AdminInvoicesList } from './components/AdminInvoicesList'
+import { AdminCompletedJobsList } from './components/AdminCompletedJobsList'
 import { displayDriverName } from './lib/driverDisplay'
 
 export type PageType =
@@ -45,6 +46,7 @@ export type PageType =
   | 'admin-open-jobs'
   | 'admin-job-edit'
   | 'admin-confirmed-jobs'
+  | 'admin-completed-jobs'
   | 'admin-invoices'
   | 'admin-invoice-detail'
   | 'driver-jobs-list'
@@ -855,6 +857,13 @@ function App() {
             {pageName === 'admin-confirmed-jobs' && (
               <AdminConfirmedJobsList
                 onBack={() => setPageName('admin-dashboard')}
+                onNavigateToCompletedJobs={() => setPageName('admin-completed-jobs')}
+              />
+            )}
+
+            {pageName === 'admin-completed-jobs' && (
+              <AdminCompletedJobsList
+                onBack={() => setPageName('admin-confirmed-jobs')}
               />
             )}
 

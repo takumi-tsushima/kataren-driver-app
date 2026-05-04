@@ -16,6 +16,7 @@ type AdminPageType =
     | 'admin-draft-jobs'
     | 'admin-open-jobs'
     | 'admin-confirmed-jobs'
+    | 'admin-completed-jobs'
     | 'admin-invoices'
 
 type Props = {
