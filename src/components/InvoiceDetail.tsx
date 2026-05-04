@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ChevronLeft, Printer, AlertCircle, Repeat, ArrowRight } from 'lucide-react'
+import { ChevronLeft, Printer, AlertCircle, Repeat, ArrowRight, Undo2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import {
   COMPANY_NAME_TO,
@@ -8,6 +8,8 @@ import {
   formatDateLong,
   formatPostalCode,
   formatBankAccountLine,
+  INVOICE_STATUS_LABELS,
+  INVOICE_STATUS_BADGE_CLASSES,
   type InvoiceRow,
   type InvoiceItemRow,
 } from '../lib/invoiceFormat'
@@ -88,6 +90,7 @@ export const InvoiceDetail: React.FC<InvoiceDetailProps> = ({ invoiceId, onBack 
   }
 
   const isCancelled = invoice.status === 'cancelled'
+  const isRejected  = invoice.status === 'rejected'
 
   return (
     <div className="w-full pb-16">
@@ -113,11 +116,18 @@ export const InvoiceDetail: React.FC<InvoiceDetailProps> = ({ invoiceId, onBack 
 
       {/* 請求書本体 */}
       <div className="invoice-print-area mx-auto max-w-4xl bg-white border border-slate-200 rounded-2xl shadow-sm p-8 md:p-12 text-slate-900">
-        {/* ヘッダ：右上に発行日と請求書番号 */}
-        <header className="flex justify-end text-sm">
-          <div className="text-right space-y-1">
+        {/* ヘッダ：右上に発行日 + 請求書番号 + ステータスバッジ */}
+        <header className="flex items-start justify-end text-sm">
+          <div className="text-right space-y-1.5">
             <div>{formatDateLong(invoice.issued_at)}</div>
             <div>請求書番号: {invoice.invoice_number}</div>
+            <div>
+              <span
+                className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold border ${INVOICE_STATUS_BADGE_CLASSES[invoice.status]}`}
+              >
+                {INVOICE_STATUS_LABELS[invoice.status]}
+              </span>
+            </div>
           </div>
         </header>
 
@@ -126,11 +136,28 @@ export const InvoiceDetail: React.FC<InvoiceDetailProps> = ({ invoiceId, onBack 
           請　求　書
         </h1>
 
-        {/* キャンセル赤帯（issuedの場合は出ない、印刷時にも残す） */}
+        {/* キャンセル赤帯（cancelled・印刷時も残す） */}
         {isCancelled && (
           <div className="mb-6 border-2 border-red-400 bg-red-50 text-red-700 px-4 py-3 text-center font-bold">
             この請求書はキャンセルされました
             {invoice.cancelled_at && <span>（{formatDateLong(invoice.cancelled_at)}）</span>}
+          </div>
+        )}
+
+        {/* 差し戻し帯（rejected・印刷時も残す） */}
+        {isRejected && (
+          <div className="mb-6 border-2 border-orange-400 bg-orange-50 px-4 py-3 text-orange-800">
+            <div className="flex items-center justify-center gap-2 font-bold">
+              <Undo2 size={18} />
+              この請求書は差し戻されました
+              {invoice.rejected_at && <span>（{formatDateLong(invoice.rejected_at)}）</span>}
+            </div>
+            {invoice.reject_reason && (
+              <div className="mt-2 text-sm font-semibold">
+                <span className="text-orange-700">差し戻し理由：</span>
+                <span className="whitespace-pre-wrap">{invoice.reject_reason}</span>
+              </div>
+            )}
           </div>
         )}
 

@@ -1,7 +1,14 @@
-import { useEffect, useState } from 'react'
-import { FileText, ChevronRight, AlertCircle, CheckCircle2, XCircle } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { FileText, ChevronRight, AlertCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { formatJPYWithSymbol, formatDateLong } from '../lib/invoiceFormat'
+import {
+  formatJPYWithSymbol,
+  formatDateLong,
+  INVOICE_STATUS_VALUES,
+  INVOICE_STATUS_LABELS,
+  INVOICE_STATUS_BADGE_CLASSES,
+  type InvoiceStatus,
+} from '../lib/invoiceFormat'
 
 type InvoiceListRow = {
   id: string
@@ -9,9 +16,11 @@ type InvoiceListRow = {
   billing_year: number
   billing_month: number
   total_jpy: number
-  status: 'issued' | 'cancelled'
+  status: InvoiceStatus
   issued_at: string
 }
+
+type StatusFilter = InvoiceStatus | 'all'
 
 interface DriverInvoicesListProps {
   driverId: string
@@ -25,6 +34,7 @@ export const DriverInvoicesList: React.FC<DriverInvoicesListProps> = ({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [invoices, setInvoices] = useState<InvoiceListRow[]>([])
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
 
   useEffect(() => {
     const fetchInvoices = async () => {
@@ -51,6 +61,22 @@ export const DriverInvoicesList: React.FC<DriverInvoicesListProps> = ({
     fetchInvoices()
   }, [driverId])
 
+  const statusCounts = useMemo(() => {
+    const counts: Record<InvoiceStatus, number> = {
+      submitted: 0, approved: 0, rejected: 0, paid: 0, cancelled: 0,
+    }
+    for (const inv of invoices) counts[inv.status]++
+    return counts
+  }, [invoices])
+
+  const filteredInvoices = useMemo(
+    () =>
+      statusFilter === 'all'
+        ? invoices
+        : invoices.filter((inv) => inv.status === statusFilter),
+    [invoices, statusFilter]
+  )
+
   return (
     <div className="w-full pb-16">
       <div className="mb-5">
@@ -67,6 +93,28 @@ export const DriverInvoicesList: React.FC<DriverInvoicesListProps> = ({
         </div>
       )}
 
+      {/* ステータス絞り込み */}
+      {!loading && invoices.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <label htmlFor="invoice-status-filter" className="text-xs font-bold text-slate-600">
+            ステータス
+          </label>
+          <select
+            id="invoice-status-filter"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+            className="border border-slate-300 hover:border-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 rounded-lg px-3 py-1.5 text-sm font-semibold bg-white"
+          >
+            <option value="all">全て ({invoices.length})</option>
+            {INVOICE_STATUS_VALUES.map((s) => (
+              <option key={s} value={s}>
+                {INVOICE_STATUS_LABELS[s]} ({statusCounts[s]})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {loading ? (
         <div className="bg-white border border-slate-200 rounded-2xl p-6 text-slate-500 text-center font-medium">
           読み込み中...
@@ -79,51 +127,46 @@ export const DriverInvoicesList: React.FC<DriverInvoicesListProps> = ({
             稼働月の翌月1日〜7日に請求書を作成できる機能を準備中です。
           </p>
         </div>
+      ) : filteredInvoices.length === 0 ? (
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 text-slate-500 text-center font-medium text-sm">
+          このステータスの請求書はありません
+        </div>
       ) : (
         <ul className="space-y-3">
-          {invoices.map((inv) => {
-            const isCancelled = inv.status === 'cancelled'
-            return (
-              <li key={inv.id}>
-                <button
-                  type="button"
-                  onClick={() => onOpenInvoice(inv.id)}
-                  className="w-full text-left bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:border-slate-400 hover:bg-slate-50 transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                        <span className="text-base font-bold text-slate-900">
-                          {inv.billing_year}年{inv.billing_month}月分
-                        </span>
-                        {isCancelled ? (
-                          <span className="inline-flex items-center gap-1 rounded bg-rose-100 text-rose-700 px-2 py-0.5 text-[11px] font-bold border border-rose-200">
-                            <XCircle size={12} />
-                            キャンセル済
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded bg-emerald-100 text-emerald-700 px-2 py-0.5 text-[11px] font-bold border border-emerald-200">
-                            <CheckCircle2 size={12} />
-                            発行済
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-slate-500 space-x-3">
-                        <span>請求書番号: {inv.invoice_number}</span>
-                        <span>発行日: {formatDateLong(inv.issued_at)}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-lg font-bold text-slate-900 tabular-nums">
-                        {formatJPYWithSymbol(inv.total_jpy)}
+          {filteredInvoices.map((inv) => (
+            <li key={inv.id}>
+              <button
+                type="button"
+                onClick={() => onOpenInvoice(inv.id)}
+                className="w-full text-left bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:border-slate-400 hover:bg-slate-50 transition-colors"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                      <span className="text-base font-bold text-slate-900">
+                        {inv.billing_year}年{inv.billing_month}月分
                       </span>
-                      <ChevronRight size={18} className="text-slate-400" />
+                      <span
+                        className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold border ${INVOICE_STATUS_BADGE_CLASSES[inv.status]}`}
+                      >
+                        {INVOICE_STATUS_LABELS[inv.status]}
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-500 space-x-3">
+                      <span>請求書番号: {inv.invoice_number}</span>
+                      <span>発行日: {formatDateLong(inv.issued_at)}</span>
                     </div>
                   </div>
-                </button>
-              </li>
-            )
-          })}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-lg font-bold text-slate-900 tabular-nums">
+                      {formatJPYWithSymbol(inv.total_jpy)}
+                    </span>
+                    <ChevronRight size={18} className="text-slate-400" />
+                  </div>
+                </div>
+              </button>
+            </li>
+          ))}
         </ul>
       )}
     </div>
