@@ -11,6 +11,7 @@ import {
   type InvoiceRow,
   type InvoiceItemRow,
 } from '../lib/invoiceFormat'
+import { extractBrandFromPair } from '../lib/brand'
 import './InvoiceDetail.css'
 
 interface InvoiceDetailProps {
@@ -165,6 +166,7 @@ export const InvoiceDetail: React.FC<InvoiceDetailProps> = ({ invoiceId, onBack 
         <table className="w-full border-collapse text-sm mb-6">
           <thead>
             <tr className="bg-slate-500 text-white">
+              <th className="text-center p-3 font-bold w-28">実施日</th>
               <th className="text-center p-3 font-bold">品目</th>
               <th className="text-center p-3 font-bold w-20">数量</th>
               <th className="text-center p-3 font-bold w-24">単価</th>
@@ -172,46 +174,58 @@ export const InvoiceDetail: React.FC<InvoiceDetailProps> = ({ invoiceId, onBack 
             </tr>
           </thead>
           <tbody>
-            {items.map((item) => (
-              <tr key={item.id} className="border-b border-slate-300">
-                <td className="p-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-slate-500">[{item.work_date}]</span>
-                    <span className="font-medium">{item.pickup_snapshot ?? '?'}</span>
-                    <ArrowRight size={14} className="text-slate-400 shrink-0" />
-                    <span className="font-medium">{item.dropoff_snapshot ?? '?'}</span>
-                    {item.round_trip_role_snapshot === 'outbound' && (
-                      <span className="inline-flex items-center gap-1 rounded bg-indigo-100 text-indigo-700 px-2 py-0.5 text-[11px] font-bold border border-indigo-200">
-                        <Repeat size={10} />
-                        往
-                      </span>
-                    )}
-                    {item.round_trip_role_snapshot === 'return' && (
-                      <span className="inline-flex items-center gap-1 rounded bg-teal-100 text-teal-700 px-2 py-0.5 text-[11px] font-bold border border-teal-200">
-                        <Repeat size={10} />
-                        復
-                      </span>
-                    )}
-                  </div>
-                </td>
-                <td className="text-right p-3 tabular-nums">{item.quantity}</td>
-                <td className="text-right p-3 tabular-nums">{formatJPY(item.unit_price_jpy)}</td>
-                <td className="text-right p-3 tabular-nums">{formatJPY(item.amount_jpy)}</td>
-              </tr>
-            ))}
+            {items.map((item) => {
+              const { brand, pickupShort, dropoffShort } = extractBrandFromPair(
+                item.pickup_snapshot,
+                item.dropoff_snapshot
+              )
+              return (
+                <tr key={item.id} className="border-b border-slate-300">
+                  <td className="p-3 tabular-nums whitespace-nowrap">{item.work_date}</td>
+                  <td className="p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {brand && (
+                        <span className="text-slate-700 font-semibold">[{brand}]</span>
+                      )}
+                      <span className="font-medium">{pickupShort || '?'}</span>
+                      <ArrowRight size={14} className="text-slate-400 shrink-0" />
+                      <span className="font-medium">{dropoffShort || '?'}</span>
+                      {item.round_trip_role_snapshot === 'outbound' && (
+                        <span className="inline-flex items-center gap-1 rounded bg-indigo-100 text-indigo-700 px-2 py-0.5 text-[11px] font-bold border border-indigo-200">
+                          <Repeat size={10} />
+                          往
+                        </span>
+                      )}
+                      {item.round_trip_role_snapshot === 'return' && (
+                        <span className="inline-flex items-center gap-1 rounded bg-teal-100 text-teal-700 px-2 py-0.5 text-[11px] font-bold border border-teal-200">
+                          <Repeat size={10} />
+                          復
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="text-right p-3 tabular-nums">{item.quantity}</td>
+                  <td className="text-right p-3 tabular-nums">{formatJPY(item.unit_price_jpy)}</td>
+                  <td className="text-right p-3 tabular-nums">{formatJPY(item.amount_jpy)}</td>
+                </tr>
+              )
+            })}
           </tbody>
           <tfoot>
             <tr className="border-t border-slate-300">
+              <td className="p-3"></td>
               <td className="p-3"></td>
               <td colSpan={2} className="text-right p-3 bg-slate-50">小計</td>
               <td className="text-right p-3 tabular-nums bg-slate-50">{formatJPY(invoice.subtotal_jpy)}</td>
             </tr>
             <tr>
               <td className="p-3"></td>
-              <td colSpan={2} className="text-right p-3 bg-slate-50">消費税 (10% 内税)</td>
+              <td className="p-3"></td>
+              <td colSpan={2} className="text-right p-3 bg-slate-50">消費税 (10%)</td>
               <td className="text-right p-3 tabular-nums bg-slate-50">{formatJPY(invoice.tax_jpy)}</td>
             </tr>
             <tr className="font-bold">
+              <td className="p-3"></td>
               <td className="p-3"></td>
               <td colSpan={2} className="text-right p-3 bg-slate-100">合計</td>
               <td className="text-right p-3 tabular-nums bg-slate-100">{formatJPY(invoice.total_jpy)}</td>

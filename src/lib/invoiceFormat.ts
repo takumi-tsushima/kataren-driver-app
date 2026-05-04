@@ -96,13 +96,6 @@ export const formatPostalCode = (raw: string | null | undefined): string => {
   return `〒${trimmed}`
 }
 
-// '[2026-04-21] 品川店 → 成田店'
-export const formatItemTitle = (item: InvoiceItemRow): string => {
-  const pickup  = item.pickup_snapshot  ?? '?'
-  const dropoff = item.dropoff_snapshot ?? '?'
-  return `[${item.work_date}] ${pickup} → ${dropoff}`
-}
-
 // 振込先1行: 'カタレン銀行 カタレン支店 普通 1234567 カタレン タロウ'
 export const formatBankAccountLine = (invoice: InvoiceRow): string => {
   const parts = [

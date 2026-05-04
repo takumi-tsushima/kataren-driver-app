@@ -321,7 +321,7 @@ export const AdminJobEdit = ({ jobId, onBack }: Props) => {
                     <div className="flex flex-col gap-2">
                         <label className="flex items-center gap-1.5 font-bold text-slate-700 text-sm">
                             <JapaneseYen size={16} />
-                            報酬（1名あたり・税込）
+                            報酬（1名あたり・税抜）
                             <span className="ml-auto text-[10px] font-medium text-slate-500">
                                 {groupId ? '※往路・復路はそれぞれ別レコードで設定' : ''}
                             </span>

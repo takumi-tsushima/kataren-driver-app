@@ -175,8 +175,8 @@ export const AdminJobCreate: React.FC<{
   const [dropoffLocation, setDropoffLocation] = useState('')
   const [returnPickupLocation, setReturnPickupLocation] = useState('')
   const [returnDropoffLocation, setReturnDropoffLocation] = useState('')
-  const [feePerDriver, setFeePerDriver] = useState<string>('')          // 片道 or 往路の報酬（円・税込）
-  const [returnFeePerDriver, setReturnFeePerDriver] = useState<string>('') // 復路の報酬（円・税込）
+  const [feePerDriver, setFeePerDriver] = useState<string>('')          // 片道 or 往路の報酬（円・税抜）
+  const [returnFeePerDriver, setReturnFeePerDriver] = useState<string>('') // 復路の報酬（円・税抜）
   const [headcount, setHeadcount] = useState(1)
   const [deadlineDate, setDeadlineDate] = useState('')
   const [deadlineTime, setDeadlineTime] = useState('23:59')
@@ -503,7 +503,7 @@ export const AdminJobCreate: React.FC<{
               <div className="mt-3 flex flex-col gap-2">
                 <label className="flex items-center gap-2 font-bold text-slate-700 text-sm">
                   <JapaneseYen size={16} className="text-slate-400" />
-                  報酬（{areaTag === 'round_trip' ? '往路・1名あたり・税込' : '1名あたり・税込'}）
+                  報酬（{areaTag === 'round_trip' ? '往路・1名あたり・税抜' : '1名あたり・税抜'}）
                   <span className="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded uppercase tracking-wider ml-auto">必須</span>
                 </label>
                 <div className="relative">
@@ -558,7 +558,7 @@ export const AdminJobCreate: React.FC<{
                 <div className="mt-3 flex flex-col gap-2">
                   <label className="flex items-center gap-2 font-bold text-violet-700 text-sm">
                     <JapaneseYen size={16} />
-                    報酬（復路・1名あたり・税込）
+                    報酬（復路・1名あたり・税抜）
                     <span className="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded uppercase tracking-wider ml-auto">必須</span>
                   </label>
                   <div className="relative">
