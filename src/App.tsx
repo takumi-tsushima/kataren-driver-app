@@ -673,21 +673,35 @@ function App() {
     if (driver.role !== 'admin') {
       return null
     }
+
+    const adminBack: { target: PageType; label: string } = (() => {
+      switch (pageName) {
+        case 'admin-dashboard':
+          return { target: 'home', label: '← ホーム' }
+        case 'admin-draft-job-edit':
+          return { target: 'admin-draft-jobs', label: '← 一覧' }
+        case 'admin-job-edit':
+          return { target: 'admin-open-jobs', label: '← 一覧' }
+        case 'admin-completed-jobs':
+          return { target: 'admin-confirmed-jobs', label: '← 戻る' }
+        case 'admin-invoice-detail':
+          return { target: 'admin-invoices', label: '← 一覧' }
+        default:
+          return { target: 'admin-dashboard', label: '← ダッシュボード' }
+      }
+    })()
+
     return (
       <div style={page}>
         <div className="max-w-7xl w-full mx-auto">
           <AppHeader
             onBack={() => {
-              setEditingJobId(null)
-              setEditingDraftJobId(null)
-              setViewingInvoiceId(null)
-              if (pageName === 'admin-dashboard') {
-                setPageName('home')
-              } else {
-                setPageName('admin-dashboard')
-              }
+              if (adminBack.target !== 'admin-job-edit') setEditingJobId(null)
+              if (adminBack.target !== 'admin-draft-job-edit') setEditingDraftJobId(null)
+              if (adminBack.target !== 'admin-invoice-detail') setViewingInvoiceId(null)
+              setPageName(adminBack.target)
             }}
-            backLabel={`← ${pageName === 'admin-dashboard' ? 'ホーム' : '戻る'}`}
+            backLabel={adminBack.label}
             userLabel={displayDriverName(driver) || userEmail}
             onLogout={handleLogout}
           />
