@@ -315,138 +315,143 @@ export const AdminCompletedJobsList = () => {
           該当する実績はありません
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-          {filtered.map((r) => {
-            const state = completionState(r)
-            const { brand, pickupShort, dropoffShort } = extractBrandFromPair(
-              r.pickup_location, r.dropoff_location
-            )
-            const subject = buildSubjectLine(r)
-            return (
-              <article
-                key={r.application_id}
-                className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3.5"
-              >
-                {/* 上段: 日付 + 往復 / 完了状態 */}
-                <header className="flex items-center justify-between gap-2">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <span className="whitespace-nowrap text-sm font-bold tabular-nums text-slate-900">
-                      {r.work_date}
-                    </span>
-                    {r.round_trip_role === 'outbound' && (
-                      <span className="inline-flex items-center gap-1 rounded border border-indigo-200 bg-indigo-100 px-1.5 py-0.5 text-[11px] font-bold text-indigo-700">
-                        <Repeat size={10} />往
-                      </span>
-                    )}
-                    {r.round_trip_role === 'return' && (
-                      <span className="inline-flex items-center gap-1 rounded border border-teal-200 bg-teal-100 px-1.5 py-0.5 text-[11px] font-bold text-teal-700">
-                        <Repeat size={10} />復
-                      </span>
-                    )}
-                  </div>
-                  {state === 'completed' && (
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
-                      <CheckCircle2 size={11} /> 完了
-                    </span>
-                  )}
-                  {state === 'pending' && (
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">
-                      <Clock size={11} /> 未完了
-                    </span>
-                  )}
-                  {state === 'cancelled' && (
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700">
-                      <XCircle size={11} /> キャンセル
-                    </span>
-                  )}
-                </header>
-
-                {/* 路線 */}
-                <div className="flex flex-wrap items-center gap-1.5 text-sm">
-                  {brand && <span className="font-semibold text-slate-700">[{brand}]</span>}
-                  <span className="font-medium text-slate-800">{pickupShort || '?'}</span>
-                  <ArrowRight size={12} className="shrink-0 text-slate-400" />
-                  <span className="font-medium text-slate-800">{dropoffShort || '?'}</span>
-                </div>
-
-                {/* ドライバー */}
-                <div className="flex items-baseline gap-2 text-xs">
-                  <span className="shrink-0 text-[11px] text-slate-400">ドライバー</span>
-                  <span className="truncate font-semibold text-slate-700">
-                    {r.driver_name ?? '(名前未登録)'}
-                  </span>
-                  {r.driver_email && (
-                    <span className="truncate text-slate-400">{r.driver_email}</span>
-                  )}
-                </div>
-
-                <div className="my-0.5 border-t border-slate-100" />
-
-                {/* 金額 + 請求 */}
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-bold tabular-nums text-slate-900">
-                    {r.fee_per_driver != null ? formatJPYWithSymbol(r.fee_per_driver) : '—'}
-                  </span>
-                  {r.invoice_status ? (
-                    <div className="flex flex-col items-end">
-                      <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold ${LOCAL_INVOICE_BADGE_CLASSES[r.invoice_status]}`}>
-                        {INVOICE_STATUS_LABELS[r.invoice_status]}
-                      </span>
-                      {r.invoice_number && (
-                        <span className="mt-0.5 text-[11px] tabular-nums text-slate-500">
-                          {r.invoice_number}
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">
-                      未請求
-                    </span>
-                  )}
-                </div>
-
-                {/* 完了詳細（完了時のみ） */}
-                {state === 'completed' && (
-                  <div className="text-[11px] text-slate-500">
-                    <span className="tabular-nums">完了 {formatDateLong(r.completed_at)}</span>
-                    {r.completed_by_name && <span> by {r.completed_by_name}</span>}
-                  </div>
-                )}
-
-                {/* 操作 */}
-                {state === 'pending' && (
-                  <div className="flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActionMessage(null); setActionError(null)
-                        setActionModal({ type: 'complete', applicationId: r.application_id, subjectLine: subject })
-                      }}
-                      className="flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[820px] text-sm">
+              <thead className="border-b border-slate-200 bg-slate-50">
+                <tr className="text-left text-xs font-bold text-slate-700">
+                  <th className="whitespace-nowrap px-3 py-2.5">稼働日</th>
+                  <th className="px-3 py-2.5">区間</th>
+                  <th className="whitespace-nowrap px-3 py-2.5">ドライバー</th>
+                  <th className="whitespace-nowrap px-3 py-2.5 text-right">報酬</th>
+                  <th className="whitespace-nowrap px-3 py-2.5">完了</th>
+                  <th className="whitespace-nowrap px-3 py-2.5">請求</th>
+                  <th className="whitespace-nowrap px-3 py-2.5 text-right">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((r, i) => {
+                  const state = completionState(r)
+                  const { brand, pickupShort, dropoffShort } = extractBrandFromPair(
+                    r.pickup_location, r.dropoff_location
+                  )
+                  const subject = buildSubjectLine(r)
+                  const stripe = i % 2 === 1 ? 'bg-slate-50/50' : 'bg-white'
+                  return (
+                    <tr
+                      key={r.application_id}
+                      className={`border-b border-slate-100 ${stripe} hover:bg-slate-100/60`}
                     >
-                      <CheckCircle2 size={12} />
-                      完了にする
-                    </button>
-                  </div>
-                )}
-                {state === 'completed' && (
-                  <div className="flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActionMessage(null); setActionError(null)
-                        setActionModal({ type: 'uncomplete', applicationId: r.application_id, subjectLine: subject })
-                      }}
-                      className="flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
-                    >
-                      <Undo2 size={12} />
-                      完了取消
-                    </button>
-                  </div>
-                )}
-              </article>
-            )
-          })}
+                      <td className="whitespace-nowrap px-3 py-2 align-top tabular-nums">
+                        {r.work_date}
+                      </td>
+                      <td className="px-3 py-2 align-top">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {r.round_trip_role === 'outbound' && (
+                            <span className="inline-flex items-center gap-1 rounded border border-indigo-200 bg-indigo-100 px-1.5 py-0.5 text-[11px] font-bold text-indigo-700">
+                              <Repeat size={10} />往
+                            </span>
+                          )}
+                          {r.round_trip_role === 'return' && (
+                            <span className="inline-flex items-center gap-1 rounded border border-teal-200 bg-teal-100 px-1.5 py-0.5 text-[11px] font-bold text-teal-700">
+                              <Repeat size={10} />復
+                            </span>
+                          )}
+                          {brand && <span className="font-semibold text-slate-700">[{brand}]</span>}
+                          <span className="font-medium text-slate-800">{pickupShort || '?'}</span>
+                          <ArrowRight size={12} className="shrink-0 text-slate-400" />
+                          <span className="font-medium text-slate-800">{dropoffShort || '?'}</span>
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2 align-top">
+                        <div className="font-semibold text-slate-900">
+                          {r.driver_name ?? '(名前未登録)'}
+                        </div>
+                        <div className="text-xs text-slate-500">{r.driver_email ?? '-'}</div>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2 align-top text-right tabular-nums">
+                        {r.fee_per_driver != null ? formatJPYWithSymbol(r.fee_per_driver) : '—'}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2 align-top">
+                        {state === 'completed' && (
+                          <div>
+                            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                              <CheckCircle2 size={11} /> 完了
+                            </span>
+                            <div className="mt-0.5 text-[11px] tabular-nums text-slate-500">
+                              {formatDateLong(r.completed_at)}
+                            </div>
+                            {r.completed_by_name && (
+                              <div className="text-[11px] text-slate-500">by {r.completed_by_name}</div>
+                            )}
+                          </div>
+                        )}
+                        {state === 'pending' && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">
+                            <Clock size={11} /> 未完了
+                          </span>
+                        )}
+                        {state === 'cancelled' && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700">
+                            <XCircle size={11} /> キャンセル
+                          </span>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2 align-top">
+                        {r.invoice_status ? (
+                          <div>
+                            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold ${LOCAL_INVOICE_BADGE_CLASSES[r.invoice_status]}`}>
+                              {INVOICE_STATUS_LABELS[r.invoice_status]}
+                            </span>
+                            {r.invoice_number && (
+                              <div className="mt-0.5 text-[11px] tabular-nums text-slate-500">
+                                {r.invoice_number}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">
+                            未請求
+                          </span>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2 align-top text-right">
+                        {state === 'pending' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActionMessage(null); setActionError(null)
+                              setActionModal({ type: 'complete', applicationId: r.application_id, subjectLine: subject })
+                            }}
+                            className="ml-auto flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"
+                          >
+                            <CheckCircle2 size={12} />
+                            完了にする
+                          </button>
+                        )}
+                        {state === 'completed' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActionMessage(null); setActionError(null)
+                              setActionModal({ type: 'uncomplete', applicationId: r.application_id, subjectLine: subject })
+                            }}
+                            className="ml-auto flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                          >
+                            <Undo2 size={12} />
+                            完了取消
+                          </button>
+                        )}
+                        {state === 'cancelled' && (
+                          <span className="text-xs text-slate-400">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
