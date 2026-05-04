@@ -97,11 +97,6 @@ function App() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
-  const normalizeNullableString = (value?: string | null) => {
-    const trimmed = value?.trim()
-    return trimmed ? trimmed : null
-  }
-
   const isDateLocked = (dateStr: string) => {
     // 今日から3日後までロック（4日間）。例：今日5/1なら5/1〜5/4ロック、5/5以降編集可
     const today = startOfDay(new Date())
@@ -116,9 +111,6 @@ function App() {
       newMap.set(s.shift_date, {
         date: s.shift_date,
         status: s.availability_status as ShiftStatus,
-        timeSlot: s.available_from_time || undefined,
-        maxJobs: s.max_jobs_per_day,
-        note: s.note || undefined,
       })
     })
     setLocalShifts(newMap)
@@ -138,12 +130,7 @@ function App() {
       } else {
         if (shift.status === 'none') {
           count++
-        } else if (
-          dbObj.availability_status !== shift.status ||
-          (dbObj.available_from_time || undefined) !== shift.timeSlot ||
-          dbObj.max_jobs_per_day !== shift.maxJobs ||
-          (dbObj.note || undefined) !== shift.note
-        ) {
+        } else if (dbObj.availability_status !== shift.status) {
           count++
         }
       }
@@ -337,12 +324,7 @@ function App() {
     })
   }
 
-  const handleApplyMultiEdit = (data: {
-    status: ShiftStatus
-    timeSlot?: string
-    maxJobs?: number
-    note?: string
-  }) => {
+  const handleApplyMultiEdit = (data: { status: ShiftStatus }) => {
     if (selectedDates.length === 0) return
 
     setLocalShifts((prevMap) => {
@@ -355,7 +337,7 @@ function App() {
 
         newMap.set(dateStr, {
           date: dateStr,
-          ...data,
+          status: data.status,
         })
       })
 
@@ -398,25 +380,17 @@ function App() {
           return
         }
 
-        const normalizedTimeSlot = normalizeNullableString(localShift.timeSlot)
-        const normalizedNote = normalizeNullableString(localShift.note)
-        const normalizedMaxJobs = localShift.maxJobs ?? 1
-
         const isChanged =
-          !dbShift ||
-          dbShift.availability_status !== localShift.status ||
-          (dbShift.available_from_time ?? null) !== normalizedTimeSlot ||
-          dbShift.max_jobs_per_day !== normalizedMaxJobs ||
-          (dbShift.note ?? null) !== normalizedNote
+          !dbShift || dbShift.availability_status !== localShift.status
 
         if (isChanged) {
           upsertPayload.push({
             driver_id: driver.id,
             shift_date: dateStr,
             availability_status: localShift.status,
-            available_from_time: normalizedTimeSlot,
-            max_jobs_per_day: normalizedMaxJobs,
-            note: normalizedNote,
+            available_from_time: null,
+            max_jobs_per_day: 1,
+            note: null,
           })
         }
       })

@@ -3,9 +3,6 @@ export type ShiftStatus = 'ok' | 'ng' | 'none'
 export type Shift = {
     date: string // YYYY-MM-DD
     status: ShiftStatus
-    timeSlot?: string // e.g. "9:00-12:00", "終日可能"
-    maxJobs?: number
-    note?: string
 }
 
 export type ShiftAvailabilityData = {
