@@ -500,9 +500,8 @@ function App() {
   }
 
   if (pageName === 'home') {
-    const homePage: CSSProperties = { ...page, padding: '10px 16px 100px 16px' }
     return (
-      <div style={homePage}>
+      <div style={page}>
         <div className="max-w-md w-full mx-auto">
           <AppHeader
             title="ホーム"
@@ -530,25 +529,12 @@ function App() {
     return (
       <div style={page}>
         <div className="max-w-md w-full mx-auto">
-          <header className="app-header">
-            <div className="header-actions" style={{ gap: 12 }}>
-              <button
-                className="logout-btn"
-                onClick={() => setPageName('home')}
-                style={{ minWidth: 'auto' }}
-              >
-                ← ホーム
-              </button>
-              <h1 style={{ margin: 0 }}>募集案件一覧</h1>
-            </div>
-
-            <div className="header-actions">
-              <span className="user-email">{displayDriverName(driver) || userEmail}</span>
-              <button className="logout-btn" onClick={handleLogout}>
-                ログアウト
-              </button>
-            </div>
-          </header>
+          <AppHeader
+            title="募集案件一覧"
+            onBack={() => setPageName('home')}
+            userLabel={displayDriverName(driver) || userEmail}
+            onLogout={handleLogout}
+          />
 
           <main className="main-content" style={{ width: '100%' }}>
             <DriverJobsList onApplied={() => setPageName('driver-my-jobs')} />
@@ -562,25 +548,12 @@ function App() {
     return (
       <div style={page}>
         <div className="max-w-md w-full mx-auto">
-          <header className="app-header">
-            <div className="header-actions" style={{ gap: 12 }}>
-              <button
-                className="logout-btn"
-                onClick={() => setPageName('home')}
-                style={{ minWidth: 'auto' }}
-              >
-                ← ホーム
-              </button>
-              <h1 style={{ margin: 0 }}>プロフィール</h1>
-            </div>
-
-            <div className="header-actions">
-              <span className="user-email">{displayDriverName(driver) || userEmail}</span>
-              <button className="logout-btn" onClick={handleLogout}>
-                ログアウト
-              </button>
-            </div>
-          </header>
+          <AppHeader
+            title="プロフィール"
+            onBack={() => setPageName('home')}
+            userLabel={displayDriverName(driver) || userEmail}
+            onLogout={handleLogout}
+          />
 
           <main className="main-content" style={{ width: '100%' }}>
             <ProfileEdit
@@ -598,25 +571,12 @@ function App() {
     return (
       <div style={page}>
         <div className="max-w-md w-full mx-auto">
-          <header className="app-header">
-            <div className="header-actions" style={{ gap: 12 }}>
-              <button
-                className="logout-btn"
-                onClick={() => setPageName('home')}
-                style={{ minWidth: 'auto' }}
-              >
-                ← ホーム
-              </button>
-              <h1 style={{ margin: 0 }}>自分の案件一覧</h1>
-            </div>
-
-            <div className="header-actions">
-              <span className="user-email">{displayDriverName(driver) || userEmail}</span>
-              <button className="logout-btn" onClick={handleLogout}>
-                ログアウト
-              </button>
-            </div>
-          </header>
+          <AppHeader
+            title="自分の案件一覧"
+            onBack={() => setPageName('home')}
+            userLabel={displayDriverName(driver) || userEmail}
+            onLogout={handleLogout}
+          />
 
           <main className="main-content" style={{ width: '100%' }}>
             <DriverMyJobsList />
@@ -630,25 +590,12 @@ function App() {
     return (
       <div style={page}>
         <div className="max-w-2xl w-full mx-auto">
-          <header className="app-header">
-            <div className="header-actions" style={{ gap: 12 }}>
-              <button
-                className="logout-btn"
-                onClick={() => setPageName('home')}
-                style={{ minWidth: 'auto' }}
-              >
-                ← ホーム
-              </button>
-              <h1 style={{ margin: 0 }}>マイ請求書</h1>
-            </div>
-
-            <div className="header-actions">
-              <span className="user-email">{displayDriverName(driver) || userEmail}</span>
-              <button className="logout-btn" onClick={handleLogout}>
-                ログアウト
-              </button>
-            </div>
-          </header>
+          <AppHeader
+            title="マイ請求書"
+            onBack={() => setPageName('home')}
+            userLabel={displayDriverName(driver) || userEmail}
+            onLogout={handleLogout}
+          />
 
           <main className="main-content" style={{ width: '100%' }}>
             <DriverInvoicesList
@@ -669,25 +616,13 @@ function App() {
     return (
       <div style={page}>
         <div className="max-w-2xl w-full mx-auto">
-          <header className="app-header">
-            <div className="header-actions" style={{ gap: 12 }}>
-              <button
-                className="logout-btn"
-                onClick={() => setPageName('driver-invoices-list')}
-                style={{ minWidth: 'auto' }}
-              >
-                ← 一覧
-              </button>
-              <h1 style={{ margin: 0 }}>請求書を作成</h1>
-            </div>
-
-            <div className="header-actions">
-              <span className="user-email">{displayDriverName(driver) || userEmail}</span>
-              <button className="logout-btn" onClick={handleLogout}>
-                ログアウト
-              </button>
-            </div>
-          </header>
+          <AppHeader
+            title="請求書を作成"
+            onBack={() => setPageName('driver-invoices-list')}
+            backLabel="← 一覧"
+            userLabel={displayDriverName(driver) || userEmail}
+            onLogout={handleLogout}
+          />
 
           <main className="main-content" style={{ width: '100%' }}>
             <DriverInvoiceCreate
@@ -708,28 +643,17 @@ function App() {
     return (
       <div style={page}>
         <div className="max-w-5xl w-full mx-auto">
-          <header className="app-header print:hidden">
-            <div className="header-actions" style={{ gap: 12 }}>
-              <button
-                className="logout-btn"
-                onClick={() => {
-                  setViewingInvoiceId(null)
-                  setPageName('driver-invoices-list')
-                }}
-                style={{ minWidth: 'auto' }}
-              >
-                ← 一覧
-              </button>
-              <h1 style={{ margin: 0 }}>請求書</h1>
-            </div>
-
-            <div className="header-actions">
-              <span className="user-email">{displayDriverName(driver) || userEmail}</span>
-              <button className="logout-btn" onClick={handleLogout}>
-                ログアウト
-              </button>
-            </div>
-          </header>
+          <AppHeader
+            title="請求書"
+            onBack={() => {
+              setViewingInvoiceId(null)
+              setPageName('driver-invoices-list')
+            }}
+            backLabel="← 一覧"
+            userLabel={displayDriverName(driver) || userEmail}
+            onLogout={handleLogout}
+            className="print:hidden"
+          />
 
           <main className="main-content" style={{ width: '100%' }}>
             <InvoiceDetail
@@ -752,26 +676,21 @@ function App() {
     return (
       <div style={page}>
         <div className="max-w-7xl w-full mx-auto">
-          <header className="app-header">
-            <div className="header-actions">
-              <button
-                className="logout-btn"
-                onClick={() => {
-                  setEditingJobId(null)
-                  setEditingDraftJobId(null)
-                  setViewingInvoiceId(null)
-                  if (pageName === 'admin-dashboard') {
-                    setPageName('home')
-                  } else {
-                    setPageName('admin-dashboard')
-                  }
-                }}
-                style={{ minWidth: 'auto' }}
-              >
-                ← {pageName === 'admin-dashboard' ? 'ホーム' : '戻る'}
-              </button>
-            </div>
-          </header>
+          <AppHeader
+            onBack={() => {
+              setEditingJobId(null)
+              setEditingDraftJobId(null)
+              setViewingInvoiceId(null)
+              if (pageName === 'admin-dashboard') {
+                setPageName('home')
+              } else {
+                setPageName('admin-dashboard')
+              }
+            }}
+            backLabel={`← ${pageName === 'admin-dashboard' ? 'ホーム' : '戻る'}`}
+            userLabel={displayDriverName(driver) || userEmail}
+            onLogout={handleLogout}
+          />
 
           <main className="main-content" style={{ width: '100%' }}>
             {pageName === 'admin-dashboard' && (
@@ -867,25 +786,12 @@ function App() {
   return (
     <div style={page}>
       <div className="max-w-md w-full mx-auto pb-4">
-        <header className="app-header">
-          <div className="header-actions" style={{ gap: 12 }}>
-            <button
-              className="logout-btn"
-              onClick={() => setPageName('home')}
-              style={{ minWidth: 'auto' }}
-            >
-              ← ホーム
-            </button>
-            <h1 style={{ margin: 0 }}>シフト入力</h1>
-          </div>
-
-          <div className="header-actions">
-            <span className="user-email">{displayDriverName(driver) || userEmail}</span>
-            <button className="logout-btn" onClick={handleLogout}>
-              ログアウト
-            </button>
-          </div>
-        </header>
+        <AppHeader
+          title="シフト入力"
+          onBack={() => setPageName('home')}
+          userLabel={displayDriverName(driver) || userEmail}
+          onLogout={handleLogout}
+        />
 
         {refreshing && <p className="hint-text">更新中...</p>}
         {message && <p className="hint-text">{message}</p>}
@@ -930,7 +836,7 @@ function App() {
 }
 
 const page: CSSProperties = {
-  padding: '24px 24px 100px 24px',
+  padding: '10px 16px 100px 16px',
   color: '#0f172a',
   background: '#f8fafc',
   minHeight: '100vh',
