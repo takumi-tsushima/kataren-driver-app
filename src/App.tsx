@@ -530,7 +530,6 @@ function App() {
       <div style={page}>
         <div className="max-w-md w-full mx-auto">
           <AppHeader
-            title="募集案件一覧"
             onBack={() => setPageName('home')}
             userLabel={displayDriverName(driver) || userEmail}
             onLogout={handleLogout}
@@ -549,7 +548,6 @@ function App() {
       <div style={page}>
         <div className="max-w-md w-full mx-auto">
           <AppHeader
-            title="プロフィール"
             onBack={() => setPageName('home')}
             userLabel={displayDriverName(driver) || userEmail}
             onLogout={handleLogout}
@@ -572,7 +570,6 @@ function App() {
       <div style={page}>
         <div className="max-w-md w-full mx-auto">
           <AppHeader
-            title="自分の案件一覧"
             onBack={() => setPageName('home')}
             userLabel={displayDriverName(driver) || userEmail}
             onLogout={handleLogout}
@@ -591,7 +588,6 @@ function App() {
       <div style={page}>
         <div className="max-w-2xl w-full mx-auto">
           <AppHeader
-            title="マイ請求書"
             onBack={() => setPageName('home')}
             userLabel={displayDriverName(driver) || userEmail}
             onLogout={handleLogout}
@@ -617,7 +613,6 @@ function App() {
       <div style={page}>
         <div className="max-w-2xl w-full mx-auto">
           <AppHeader
-            title="請求書を作成"
             onBack={() => setPageName('driver-invoices-list')}
             backLabel="← 一覧"
             userLabel={displayDriverName(driver) || userEmail}
@@ -644,7 +639,6 @@ function App() {
       <div style={page}>
         <div className="max-w-5xl w-full mx-auto">
           <AppHeader
-            title="請求書"
             onBack={() => {
               setViewingInvoiceId(null)
               setPageName('driver-invoices-list')
@@ -761,16 +755,11 @@ function App() {
 
             {pageName === 'admin-confirmed-jobs' && (
               <AdminConfirmedJobsList
-                onBack={() => setPageName('admin-dashboard')}
                 onNavigateToCompletedJobs={() => setPageName('admin-completed-jobs')}
               />
             )}
 
-            {pageName === 'admin-completed-jobs' && (
-              <AdminCompletedJobsList
-                onBack={() => setPageName('admin-confirmed-jobs')}
-              />
-            )}
+            {pageName === 'admin-completed-jobs' && <AdminCompletedJobsList />}
 
             {pageName === 'admin-invoices' && (
               <AdminInvoicesList
@@ -801,7 +790,6 @@ function App() {
     <div style={page}>
       <div className="max-w-md w-full mx-auto pb-4">
         <AppHeader
-          title="シフト入力"
           onBack={() => setPageName('home')}
           userLabel={displayDriverName(driver) || userEmail}
           onLogout={handleLogout}
@@ -811,6 +799,7 @@ function App() {
         {message && <p className="hint-text">{message}</p>}
 
         <main className="main-content">
+          <h2 className="m-0 mb-3 self-start text-2xl font-bold text-slate-900">シフト入力</h2>
           <p className="hint-text">
             日付をタップしてシフトを登録してください。複数選択も可能です。
           </p>

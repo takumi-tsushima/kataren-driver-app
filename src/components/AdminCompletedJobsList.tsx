@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  ChevronLeft,
   ArrowRight,
   Repeat,
   AlertCircle,
@@ -78,11 +77,7 @@ const getErrorMessage = (err: unknown) => {
   try { return JSON.stringify(err) } catch { return '不明なエラー' }
 }
 
-interface AdminCompletedJobsListProps {
-  onBack: () => void
-}
-
-export const AdminCompletedJobsList: React.FC<AdminCompletedJobsListProps> = ({ onBack }) => {
+export const AdminCompletedJobsList = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [records, setRecords] = useState<CompletionRecord[]>([])
@@ -192,21 +187,11 @@ export const AdminCompletedJobsList: React.FC<AdminCompletedJobsListProps> = ({ 
   return (
     <div className="w-full pb-16">
       {/* ヘッダ */}
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="m-0 text-2xl font-bold text-slate-900">実績一覧</h2>
-          <p className="mt-1.5 text-sm text-slate-600">
-            完了確認・請求書状態の突合に使う一覧です。経理・運用向け。
-          </p>
-        </div>
-        <button
-          type="button"
-          className="border border-slate-300 bg-white text-slate-700 rounded-xl px-3.5 py-2.5 font-bold flex items-center gap-2 hover:bg-slate-50 transition-colors"
-          onClick={onBack}
-        >
-          <ChevronLeft size={18} />
-          戻る
-        </button>
+      <div className="mb-5">
+        <h2 className="m-0 text-2xl font-bold text-slate-900">実績一覧</h2>
+        <p className="mt-1.5 text-sm text-slate-600">
+          完了確認・請求書状態の突合に使う一覧です。経理・運用向け。
+        </p>
       </div>
 
       {error && (

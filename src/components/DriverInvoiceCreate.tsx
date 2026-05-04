@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  ChevronLeft,
   Send,
   AlertCircle,
   CheckCircle2,
@@ -253,22 +252,11 @@ export const DriverInvoiceCreate: React.FC<DriverInvoiceCreateProps> = ({
 
   return (
     <div className="w-full pb-32">
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="m-0 text-2xl font-bold text-slate-900">請求書を作成</h2>
-          <p className="mt-1.5 text-sm text-slate-600">
-            稼働月分の請求書を申請します。申請後は管理者の承認が必要です。
-          </p>
-        </div>
-        <button
-          type="button"
-          className="border border-slate-300 bg-white text-slate-700 rounded-xl px-3.5 py-2.5 font-bold flex items-center gap-2 hover:bg-slate-50 transition-colors"
-          onClick={onCancel}
-          disabled={submitting}
-        >
-          <ChevronLeft size={18} />
-          戻る
-        </button>
+      <div className="mb-5">
+        <h2 className="m-0 text-2xl font-bold text-slate-900">請求書を作成</h2>
+        <p className="mt-1.5 text-sm text-slate-600">
+          稼働月分の請求書を申請します。申請後は管理者の承認が必要です。
+        </p>
       </div>
 
       {/* 対象月セクション */}

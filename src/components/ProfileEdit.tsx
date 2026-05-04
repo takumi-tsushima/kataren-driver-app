@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import {
-  ChevronLeft,
   Save,
   User,
   MapPin,
@@ -157,22 +156,11 @@ export const ProfileEdit: React.FC<ProfileEditProps> = ({ driverId, email, onBac
 
   return (
     <div className="w-full pb-32">
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="m-0 text-2xl font-bold text-slate-900">プロフィール編集</h2>
-          <p className="mt-1.5 text-sm text-slate-600">
-            請求書に記載される情報を編集できます。未入力の項目は請求書生成時にエラーとなります。
-          </p>
-        </div>
-        <button
-          type="button"
-          className="border border-slate-300 bg-white text-slate-700 rounded-xl px-3.5 py-2.5 font-bold flex items-center gap-2 hover:bg-slate-50 transition-colors"
-          onClick={onBack}
-          disabled={saving}
-        >
-          <ChevronLeft size={18} />
-          ホームへ戻る
-        </button>
+      <div className="mb-5">
+        <h2 className="m-0 text-2xl font-bold text-slate-900">プロフィール編集</h2>
+        <p className="mt-1.5 text-sm text-slate-600">
+          請求書に記載される情報を編集できます。未入力の項目は請求書生成時にエラーとなります。
+        </p>
       </div>
 
       {success && (

@@ -3,7 +3,6 @@ import { supabase } from '../lib/supabase'
 import { displayDriverName } from '../lib/driverDisplay'
 import { formatJobRoute, isRoundTrip } from '../lib/jobLocation'
 import {
-    ArrowLeft,
     ArrowRight,
     Ban,
     CalendarDays,
@@ -86,7 +85,6 @@ type ConfirmedJob = {
 }
 
 interface AdminConfirmedJobsListProps {
-    onBack: () => void
     onNavigateToCompletedJobs?: () => void
 }
 
@@ -216,7 +214,6 @@ function getApplicationConfirmedAt(app: ApplicationRow): string | null {
 }
 
 export const AdminConfirmedJobsList: React.FC<AdminConfirmedJobsListProps> = ({
-    onBack,
     onNavigateToCompletedJobs,
 }) => {
     const [jobs, setJobs] = useState<ConfirmedJob[]>([])
@@ -464,15 +461,6 @@ export const AdminConfirmedJobsList: React.FC<AdminConfirmedJobsListProps> = ({
     return (
         <div className="min-h-screen bg-slate-50 px-4 py-6 md:px-8 md:py-8">
             <div className="mx-auto max-w-7xl">
-                <button
-                    type="button"
-                    onClick={onBack}
-                    className="mb-6 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100"
-                >
-                    <ArrowLeft size={20} />
-                    戻る
-                </button>
-
                 <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                     <div>
                         <h1 className="text-3xl font-bold tracking-tight text-slate-900">

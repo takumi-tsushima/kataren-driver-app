@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { Calendar, MapPin, Users, Clock, FileText, Save, ChevronLeft, Repeat, ArrowRight, JapaneseYen } from 'lucide-react'
+import { Calendar, MapPin, Users, Clock, FileText, Save, Repeat, ArrowRight, JapaneseYen } from 'lucide-react'
 import { AREA_TAG_LABELS, type AreaTag } from '../lib/jobLocation'
 import { STORE_OPTIONS } from '../lib/storeOptions'
 
@@ -168,26 +168,16 @@ export const AdminDraftJobEdit = ({ jobId, onBack }: Props) => {
 
     return (
         <div className="w-full pb-24">
-            <div className="flex justify-between items-start gap-4 mb-5 flex-wrap">
-                <div>
-                    <h2 className="m-0 text-2xl font-bold text-slate-900">下書き案件編集</h2>
-                    <p className="mt-1.5 text-slate-600 text-sm">下書き状態の案件を編集できます。</p>
-                    {groupId && (
-                        <div className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-violet-100 px-2 py-1 text-xs font-bold text-violet-700 border border-violet-200">
-                            <Repeat size={12} />
-                            往復セット（group_id: {groupId.slice(0, 8)}…）
-                            <span className="ml-1 font-normal text-violet-600">復路は別レコードとして編集してください</span>
-                        </div>
-                    )}
-                </div>
-
-                <button
-                    className="border border-slate-300 bg-white text-slate-700 rounded-xl px-3.5 py-2.5 font-bold flex items-center gap-2 hover:bg-slate-50 transition-colors"
-                    onClick={onBack}
-                >
-                    <ChevronLeft size={18} />
-                    一覧へ戻る
-                </button>
+            <div className="mb-5">
+                <h2 className="m-0 text-2xl font-bold text-slate-900">下書き案件編集</h2>
+                <p className="mt-1.5 text-slate-600 text-sm">下書き状態の案件を編集できます。</p>
+                {groupId && (
+                    <div className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-violet-100 px-2 py-1 text-xs font-bold text-violet-700 border border-violet-200">
+                        <Repeat size={12} />
+                        往復セット（group_id: {groupId.slice(0, 8)}…）
+                        <span className="ml-1 font-normal text-violet-600">復路は別レコードとして編集してください</span>
+                    </div>
+                )}
             </div>
 
             {message && (

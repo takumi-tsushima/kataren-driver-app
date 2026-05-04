@@ -173,15 +173,7 @@ export const InvoiceDetail: React.FC<InvoiceDetailProps> = ({
   return (
     <div className="w-full pb-16">
       {/* 上部アクションバー（印刷時は非表示） */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <button
-          type="button"
-          className="border border-slate-300 bg-white text-slate-700 rounded-xl px-3.5 py-2.5 font-bold flex items-center gap-2 hover:bg-slate-50 transition-colors"
-          onClick={onBack}
-        >
-          <ChevronLeft size={18} />
-          戻る
-        </button>
+      <div className="mb-4 flex flex-wrap items-center justify-end gap-3 print:hidden">
         <button
           type="button"
           className="bg-slate-900 text-white rounded-xl px-4 py-2.5 font-bold flex items-center gap-2 hover:bg-slate-800 transition-colors"
