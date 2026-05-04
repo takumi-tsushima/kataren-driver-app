@@ -525,14 +525,21 @@ function App() {
   }
 
   if (pageName === 'home') {
+    const homePage: CSSProperties = { ...page, padding: '10px 16px 100px 16px' }
     return (
-      <div style={page}>
+      <div style={homePage}>
         <div className="max-w-md w-full mx-auto">
-          <header className="app-header">
-            <h1>ホーム</h1>
-            <div className="header-actions">
-              <span className="user-email">{displayDriverName(driver) || userEmail}</span>
-              <button className="logout-btn" onClick={handleLogout}>
+          <header className="mb-1 flex items-center justify-between gap-3">
+            <h1 className="m-0 text-base font-bold text-slate-900">ホーム</h1>
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="max-w-[140px] truncate text-xs text-slate-500">
+                {displayDriverName(driver) || userEmail}
+              </span>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="shrink-0 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 active:bg-slate-100"
+              >
                 ログアウト
               </button>
             </div>
