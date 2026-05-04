@@ -27,6 +27,7 @@ import { AdminConfirmedJobsList } from './components/AdminConfirmedJobsList'
 import { ProfileRegister } from './components/ProfileRegister'
 import { ProfileEdit } from './components/ProfileEdit'
 import { DriverInvoicesList } from './components/DriverInvoicesList'
+import { DriverInvoiceCreate } from './components/DriverInvoiceCreate'
 import { InvoiceDetail } from './components/InvoiceDetail'
 import { displayDriverName } from './lib/driverDisplay'
 
@@ -46,6 +47,7 @@ export type PageType =
   | 'driver-jobs-list'
   | 'driver-my-jobs'
   | 'driver-invoices-list'
+  | 'driver-invoice-create'
   | 'driver-invoice-detail'
 
 type UserRole = 'driver' | 'admin'
@@ -676,6 +678,46 @@ function App() {
               driverId={driver.id}
               onOpenInvoice={(id) => {
                 setViewingInvoiceId(id)
+                setPageName('driver-invoice-detail')
+              }}
+              onCreateInvoice={() => setPageName('driver-invoice-create')}
+            />
+          </main>
+        </div>
+      </div>
+    )
+  }
+
+  if (pageName === 'driver-invoice-create') {
+    return (
+      <div style={page}>
+        <div className="max-w-2xl w-full mx-auto">
+          <header className="app-header">
+            <div className="header-actions" style={{ gap: 12 }}>
+              <button
+                className="logout-btn"
+                onClick={() => setPageName('driver-invoices-list')}
+                style={{ minWidth: 'auto' }}
+              >
+                ← 一覧
+              </button>
+              <h1 style={{ margin: 0 }}>請求書を作成</h1>
+            </div>
+
+            <div className="header-actions">
+              <span className="user-email">{displayDriverName(driver) || userEmail}</span>
+              <button className="logout-btn" onClick={handleLogout}>
+                ログアウト
+              </button>
+            </div>
+          </header>
+
+          <main className="main-content" style={{ width: '100%' }}>
+            <DriverInvoiceCreate
+              driverId={driver.id}
+              onCancel={() => setPageName('driver-invoices-list')}
+              onCreated={(invoiceId) => {
+                setViewingInvoiceId(invoiceId)
                 setPageName('driver-invoice-detail')
               }}
             />

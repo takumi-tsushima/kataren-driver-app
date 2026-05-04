@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FileText, ChevronRight, AlertCircle } from 'lucide-react'
+import { FileText, ChevronRight, AlertCircle, FilePlus } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import {
   formatJPYWithSymbol,
@@ -25,11 +25,13 @@ type StatusFilter = InvoiceStatus | 'all'
 interface DriverInvoicesListProps {
   driverId: string
   onOpenInvoice: (invoiceId: string) => void
+  onCreateInvoice: () => void
 }
 
 export const DriverInvoicesList: React.FC<DriverInvoicesListProps> = ({
   driverId,
   onOpenInvoice,
+  onCreateInvoice,
 }) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -79,11 +81,21 @@ export const DriverInvoicesList: React.FC<DriverInvoicesListProps> = ({
 
   return (
     <div className="w-full pb-16">
-      <div className="mb-5">
-        <h2 className="m-0 text-2xl font-bold text-slate-900">マイ請求書</h2>
-        <p className="mt-1.5 text-sm text-slate-600">
-          発行済みの請求書を確認・印刷できます。生成機能は今後追加予定です。
-        </p>
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="m-0 text-2xl font-bold text-slate-900">マイ請求書</h2>
+          <p className="mt-1.5 text-sm text-slate-600">
+            稼働月分の請求書を申請・確認できます。
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onCreateInvoice}
+          className="bg-slate-900 text-white rounded-xl px-4 py-2.5 font-bold flex items-center gap-2 hover:bg-slate-800 transition-colors"
+        >
+          <FilePlus size={18} />
+          請求書を作成
+        </button>
       </div>
 
       {error && (
