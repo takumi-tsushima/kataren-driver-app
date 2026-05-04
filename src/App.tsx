@@ -29,6 +29,7 @@ import { ProfileEdit } from './components/ProfileEdit'
 import { DriverInvoicesList } from './components/DriverInvoicesList'
 import { DriverInvoiceCreate } from './components/DriverInvoiceCreate'
 import { InvoiceDetail } from './components/InvoiceDetail'
+import { AdminInvoicesList } from './components/AdminInvoicesList'
 import { displayDriverName } from './lib/driverDisplay'
 
 export type PageType =
@@ -44,6 +45,8 @@ export type PageType =
   | 'admin-open-jobs'
   | 'admin-job-edit'
   | 'admin-confirmed-jobs'
+  | 'admin-invoices'
+  | 'admin-invoice-detail'
   | 'driver-jobs-list'
   | 'driver-my-jobs'
   | 'driver-invoices-list'
@@ -782,6 +785,7 @@ function App() {
                 onClick={() => {
                   setEditingJobId(null)
                   setEditingDraftJobId(null)
+                  setViewingInvoiceId(null)
                   if (pageName === 'admin-dashboard') {
                     setPageName('home')
                   } else {
@@ -851,6 +855,26 @@ function App() {
             {pageName === 'admin-confirmed-jobs' && (
               <AdminConfirmedJobsList
                 onBack={() => setPageName('admin-dashboard')}
+              />
+            )}
+
+            {pageName === 'admin-invoices' && (
+              <AdminInvoicesList
+                onOpenInvoice={(id) => {
+                  setViewingInvoiceId(id)
+                  setPageName('admin-invoice-detail')
+                }}
+              />
+            )}
+
+            {pageName === 'admin-invoice-detail' && viewingInvoiceId && (
+              <InvoiceDetail
+                invoiceId={viewingInvoiceId}
+                onBack={() => {
+                  setViewingInvoiceId(null)
+                  setPageName('admin-invoices')
+                }}
+                showAdminActions
               />
             )}
           </main>

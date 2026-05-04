@@ -1,5 +1,17 @@
-import { useEffect, useState } from 'react'
-import { ChevronLeft, Printer, AlertCircle, Repeat, ArrowRight, Undo2 } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import {
+  ChevronLeft,
+  Printer,
+  AlertCircle,
+  Repeat,
+  ArrowRight,
+  Undo2,
+  ShieldCheck,
+  CheckCircle2,
+  BadgeCheck,
+  Trash2,
+  History,
+} from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import {
   COMPANY_NAME_TO,
@@ -14,49 +26,115 @@ import {
   type InvoiceItemRow,
 } from '../lib/invoiceFormat'
 import { extractBrandFromPair } from '../lib/brand'
+import { ConfirmModal } from './ConfirmModal'
 import './InvoiceDetail.css'
+
+type AdminActionType = 'approve' | 'reject' | 'mark_paid' | 'cancel'
 
 interface InvoiceDetailProps {
   invoiceId: string
   onBack: () => void
+  /** 管理者操作セクション（承認・差し戻し・精算済・キャンセル）を表示するか */
+  showAdminActions?: boolean
+  /** 操作RPCが成功した直後に呼ばれる（一覧側で再fetchしたい場合に使用） */
+  onActionCompleted?: () => void
 }
 
-export const InvoiceDetail: React.FC<InvoiceDetailProps> = ({ invoiceId, onBack }) => {
+const getErrorMessage = (err: unknown) => {
+  if (err instanceof Error) return err.message
+  if (
+    typeof err === 'object' &&
+    err !== null &&
+    'message' in err &&
+    typeof (err as { message?: unknown }).message === 'string'
+  ) {
+    return (err as { message: string }).message
+  }
+  try { return JSON.stringify(err) } catch { return '不明なエラー' }
+}
+
+export const InvoiceDetail: React.FC<InvoiceDetailProps> = ({
+  invoiceId,
+  onBack,
+  showAdminActions = false,
+  onActionCompleted,
+}) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [invoice, setInvoice] = useState<InvoiceRow | null>(null)
   const [items, setItems] = useState<InvoiceItemRow[]>([])
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const [invoiceRes, itemsRes] = await Promise.all([
-          supabase.from('invoices').select('*').eq('id', invoiceId).single(),
-          supabase
-            .from('invoice_items')
-            .select('*')
-            .eq('invoice_id', invoiceId)
-            .order('display_order', { ascending: true }),
-        ])
+  // admin 操作関連
+  const [actionModal, setActionModal] = useState<AdminActionType | null>(null)
+  const [actionMessage, setActionMessage] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
-        if (invoiceRes.error) throw invoiceRes.error
-        if (itemsRes.error) throw itemsRes.error
+  const fetchData = useCallback(async () => {
+    setError(null)
+    try {
+      const [invoiceRes, itemsRes] = await Promise.all([
+        supabase.from('invoices').select('*').eq('id', invoiceId).single(),
+        supabase
+          .from('invoice_items')
+          .select('*')
+          .eq('invoice_id', invoiceId)
+          .order('display_order', { ascending: true }),
+      ])
 
-        setInvoice(invoiceRes.data as InvoiceRow)
-        setItems((itemsRes.data ?? []) as InvoiceItemRow[])
-      } catch (e) {
-        console.error(e)
-        const msg = e instanceof Error ? e.message : '不明なエラー'
-        setError(`請求書の取得に失敗しました: ${msg}`)
-      } finally {
-        setLoading(false)
-      }
+      if (invoiceRes.error) throw invoiceRes.error
+      if (itemsRes.error) throw itemsRes.error
+
+      setInvoice(invoiceRes.data as InvoiceRow)
+      setItems((itemsRes.data ?? []) as InvoiceItemRow[])
+    } catch (e) {
+      console.error(e)
+      setError(`請求書の取得に失敗しました: ${getErrorMessage(e)}`)
     }
-
-    fetchData()
   }, [invoiceId])
+
+  useEffect(() => {
+    setLoading(true)
+    fetchData().finally(() => setLoading(false))
+  }, [fetchData])
+
+  // 各 admin 操作の実行
+  const runAction = async (action: AdminActionType, reason?: string) => {
+    setActionError(null)
+    let rpcName: string
+    let rpcParams: Record<string, unknown>
+    let successMsg: string
+    switch (action) {
+      case 'approve':
+        rpcName = 'approve_invoice'
+        rpcParams = { p_invoice_id: invoiceId }
+        successMsg = '承認しました'
+        break
+      case 'reject':
+        rpcName = 'reject_invoice'
+        rpcParams = { p_invoice_id: invoiceId, p_reason: reason ?? '' }
+        successMsg = '差し戻しました'
+        break
+      case 'mark_paid':
+        rpcName = 'mark_invoice_paid'
+        rpcParams = { p_invoice_id: invoiceId }
+        successMsg = '精算済みにしました'
+        break
+      case 'cancel':
+        rpcName = 'cancel_invoice'
+        rpcParams = { p_invoice_id: invoiceId }
+        successMsg = 'キャンセルしました'
+        break
+    }
+    const { error: rpcError } = await supabase.rpc(rpcName, rpcParams)
+    if (rpcError) {
+      // ConfirmModal 内で例外として扱われ、モーダルにエラー表示される
+      throw new Error(getErrorMessage(rpcError))
+    }
+    setActionModal(null)
+    setActionMessage(successMsg)
+    await fetchData()
+    onActionCompleted?.()
+  }
 
   if (loading) {
     return (
@@ -306,6 +384,163 @@ export const InvoiceDetail: React.FC<InvoiceDetailProps> = ({ invoiceId, onBack 
           印刷 / PDF保存
         </button>
       </div>
+
+      {/* 履歴情報セクション（admin のみ・印刷時非表示） */}
+      {showAdminActions && (
+        <section className="mt-6 mx-auto max-w-4xl bg-white border border-slate-200 rounded-2xl p-5 shadow-sm print:hidden">
+          <h3 className="text-base font-bold text-slate-800 mb-3 pb-2 border-b border-slate-100 flex items-center gap-2">
+            <History size={18} className="text-slate-500" />
+            履歴
+          </h3>
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-y-1.5 gap-x-6 text-sm">
+            <div className="flex justify-between sm:block">
+              <dt className="text-slate-500">発行日時</dt>
+              <dd className="font-semibold text-slate-900">{formatDateLong(invoice.issued_at)}</dd>
+            </div>
+            {invoice.approved_at && (
+              <div className="flex justify-between sm:block">
+                <dt className="text-blue-600">承認日時</dt>
+                <dd className="font-semibold text-slate-900">{formatDateLong(invoice.approved_at)}</dd>
+              </div>
+            )}
+            {invoice.rejected_at && (
+              <div className="flex justify-between sm:block">
+                <dt className="text-rose-600">差し戻し日時</dt>
+                <dd className="font-semibold text-slate-900">{formatDateLong(invoice.rejected_at)}</dd>
+              </div>
+            )}
+            {invoice.paid_at && (
+              <div className="flex justify-between sm:block">
+                <dt className="text-emerald-600">精算日時</dt>
+                <dd className="font-semibold text-slate-900">{formatDateLong(invoice.paid_at)}</dd>
+              </div>
+            )}
+            {invoice.cancelled_at && (
+              <div className="flex justify-between sm:block">
+                <dt className="text-slate-500">キャンセル日時</dt>
+                <dd className="font-semibold text-slate-900">{formatDateLong(invoice.cancelled_at)}</dd>
+              </div>
+            )}
+          </dl>
+        </section>
+      )}
+
+      {/* 管理者操作セクション（admin のみ・印刷時非表示） */}
+      {showAdminActions && (
+        <section className="mt-4 mx-auto max-w-4xl bg-white border border-slate-200 rounded-2xl p-5 shadow-sm print:hidden">
+          <h3 className="text-base font-bold text-slate-800 mb-3 pb-2 border-b border-slate-100 flex items-center gap-2">
+            <ShieldCheck size={18} className="text-slate-500" />
+            管理者操作
+          </h3>
+
+          {/* ステータス別ガイダンス */}
+          <p className="text-sm text-slate-600 mb-4">
+            {invoice.status === 'submitted' && '申請中の請求書です。承認 / 差し戻し / キャンセル ができます。'}
+            {invoice.status === 'approved'  && '承認済みの請求書です。精算が完了したら精算済みに変更してください。'}
+            {invoice.status === 'rejected'  && '差し戻された請求書です。必要に応じてキャンセルできます。'}
+            {invoice.status === 'paid'      && '精算済みの請求書です。経理ミスの修正のためのみキャンセル可能です。'}
+            {invoice.status === 'cancelled' && 'キャンセル済みの請求書です。これ以上の操作はできません。'}
+          </p>
+
+          {/* 操作ボタン群 */}
+          {invoice.status !== 'cancelled' && (
+            <div className="flex flex-wrap gap-2">
+              {invoice.status === 'submitted' && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => { setActionMessage(null); setActionError(null); setActionModal('approve') }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2.5 font-bold flex items-center gap-2 transition-colors"
+                  >
+                    <CheckCircle2 size={18} />
+                    承認
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setActionMessage(null); setActionError(null); setActionModal('reject') }}
+                    className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl px-4 py-2.5 font-bold flex items-center gap-2 transition-colors"
+                  >
+                    <Undo2 size={18} />
+                    差し戻し
+                  </button>
+                </>
+              )}
+              {invoice.status === 'approved' && (
+                <button
+                  type="button"
+                  onClick={() => { setActionMessage(null); setActionError(null); setActionModal('mark_paid') }}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-4 py-2.5 font-bold flex items-center gap-2 transition-colors"
+                >
+                  <BadgeCheck size={18} />
+                  精算済みにする
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => { setActionMessage(null); setActionError(null); setActionModal('cancel') }}
+                className="border border-slate-300 bg-white text-slate-700 rounded-xl px-4 py-2.5 font-bold flex items-center gap-2 hover:bg-slate-50 transition-colors"
+              >
+                <Trash2 size={18} />
+                キャンセル
+              </button>
+            </div>
+          )}
+
+          {actionMessage && (
+            <div className="mt-4 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-700">
+              <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
+              <span>{actionMessage}</span>
+            </div>
+          )}
+          {actionError && (
+            <div className="mt-4 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">
+              <AlertCircle size={16} className="mt-0.5 shrink-0" />
+              <span>{actionError}</span>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* 確認モーダル */}
+      <ConfirmModal
+        open={actionModal === 'approve'}
+        title="請求書を承認しますか？"
+        message="承認後はドライバー側で「承認済」ステータスとして表示されます。"
+        confirmLabel="承認する"
+        confirmColor="primary"
+        onConfirm={() => runAction('approve')}
+        onCancel={() => setActionModal(null)}
+      />
+      <ConfirmModal
+        open={actionModal === 'reject'}
+        title="請求書を差し戻しますか？"
+        message="ドライバーには差し戻し理由が表示されます。修正の上で再申請してもらってください。"
+        confirmLabel="差し戻す"
+        confirmColor="danger"
+        withReason
+        reasonRequired
+        reasonPlaceholder="例: 4/5の案件は別請求書に含まれているため、外して再申請してください。"
+        onConfirm={(reason) => runAction('reject', reason)}
+        onCancel={() => setActionModal(null)}
+      />
+      <ConfirmModal
+        open={actionModal === 'mark_paid'}
+        title="精算済みにしますか？"
+        message="支払いが完了したことをマークします。一覧では「精算済」として表示されます。"
+        confirmLabel="精算済みにする"
+        confirmColor="success"
+        onConfirm={() => runAction('mark_paid')}
+        onCancel={() => setActionModal(null)}
+      />
+      <ConfirmModal
+        open={actionModal === 'cancel'}
+        title="請求書をキャンセルしますか？"
+        message="キャンセル後は履歴として残ります。同じ案件は次回の請求書に再度含めることができます。"
+        confirmLabel="キャンセルする"
+        confirmColor="danger"
+        onConfirm={() => runAction('cancel')}
+        onCancel={() => setActionModal(null)}
+      />
     </div>
   )
 }
