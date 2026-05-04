@@ -121,6 +121,9 @@ export const DriverInvoiceCreate: React.FC<DriverInvoiceCreateProps> = ({
   const [previewLoading, setPreviewLoading] = useState<boolean>(false)
   const [previewError, setPreviewError]     = useState<string | null>(null)
 
+  // 選択された application_id の集合（fee_missing は除外で初期化）
+  const [selectedAppIds, setSelectedAppIds] = useState<Set<string>>(new Set())
+
   const [submitting, setSubmitting] = useState<boolean>(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -154,8 +157,58 @@ export const DriverInvoiceCreate: React.FC<DriverInvoiceCreateProps> = ({
     return () => { cancelled = true }
   }, [driverId, billingYear, billingMonth, includeCarryover])
 
+  // preview 取得後、選択を初期化（fee_missing は除外で全件チェック）
+  useEffect(() => {
+    if (preview) {
+      setSelectedAppIds(
+        new Set(preview.items.filter((i) => !i.fee_missing).map((i) => i.application_id))
+      )
+    } else {
+      setSelectedAppIds(new Set())
+    }
+  }, [preview])
+
+  // 選択された案件のみで再計算する集計
+  const selectedTotals = useMemo(() => {
+    if (!preview) return null
+    const checkedItems = preview.items.filter((i) => selectedAppIds.has(i.application_id))
+    const subtotal = checkedItems.reduce((s, i) => s + (i.fee_per_driver ?? 0), 0)
+    const taxRate = preview.totals.tax_rate
+    const tax = Math.round((subtotal * taxRate) / 100)
+    return {
+      count: checkedItems.length,
+      subtotal_jpy: subtotal,
+      tax_jpy: tax,
+      total_jpy: subtotal + tax,
+    }
+  }, [preview, selectedAppIds])
+
+  const handleToggleItem = (applicationId: string, checked: boolean) => {
+    setSelectedAppIds((prev) => {
+      const next = new Set(prev)
+      if (checked) next.add(applicationId)
+      else next.delete(applicationId)
+      return next
+    })
+  }
+
+  const handleSelectAll = () => {
+    if (!preview) return
+    setSelectedAppIds(
+      new Set(preview.items.filter((i) => !i.fee_missing).map((i) => i.application_id))
+    )
+  }
+
+  const handleDeselectAll = () => setSelectedAppIds(new Set())
+
   const handleSubmit = async () => {
-    if (!preview || !preview.can_generate || submitting) return
+    if (!preview || preview.warnings.length > 0 || submitting) return
+
+    const ids = Array.from(selectedAppIds)
+    if (ids.length === 0) {
+      setSubmitError('申請する案件を1件以上選択してください')
+      return
+    }
 
     setSubmitting(true)
     setSubmitError(null)
@@ -167,12 +220,12 @@ export const DriverInvoiceCreate: React.FC<DriverInvoiceCreateProps> = ({
         p_billing_year:      billingYear,
         p_billing_month:     billingMonth,
         p_include_carryover: includeCarryover,
+        p_application_ids:   ids,
       })
       if (error) throw error
       if (!invoiceId) throw new Error('invoice_id が返却されませんでした')
 
       setSuccess('請求書を申請しました。詳細画面へ移動します…')
-      // 0.8秒待ってから遷移
       window.setTimeout(() => onCreated(invoiceId as string), 800)
     } catch (e) {
       console.error(e)
@@ -350,18 +403,56 @@ export const DriverInvoiceCreate: React.FC<DriverInvoiceCreateProps> = ({
               </div>
             ) : (
               <>
-                <div className="text-sm font-semibold text-slate-700 mb-2">
-                  対象案件: {preview.items.length}件
+                {/* 全選択 / 全解除 + 件数表示 */}
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  <button
+                    type="button"
+                    onClick={handleSelectAll}
+                    className="text-xs font-bold text-slate-700 border border-slate-300 rounded px-2.5 py-1 hover:bg-slate-50"
+                    disabled={submitting}
+                  >
+                    全選択
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeselectAll}
+                    className="text-xs font-bold text-slate-700 border border-slate-300 rounded px-2.5 py-1 hover:bg-slate-50"
+                    disabled={submitting}
+                  >
+                    全解除
+                  </button>
+                  <span className="ml-auto text-xs font-semibold text-slate-600">
+                    {selectedAppIds.size} / {preview.items.length} 件選択中
+                  </span>
                 </div>
+
                 <ul className="divide-y divide-slate-200 border border-slate-200 rounded-xl overflow-hidden">
                   {preview.items.map((item) => {
                     const { brand, pickupShort, dropoffShort } = extractBrandFromPair(
                       item.pickup,
                       item.dropoff
                     )
+                    const checked  = selectedAppIds.has(item.application_id)
+                    const disabled = item.fee_missing || submitting
+                    const liBg = item.fee_missing
+                      ? 'bg-rose-50'
+                      : checked
+                        ? 'bg-white'
+                        : 'bg-slate-50'
                     return (
-                      <li key={item.application_id} className="p-3 bg-white">
-                        <div className="flex items-start justify-between gap-3">
+                      <li key={item.application_id} className={liBg}>
+                        <label
+                          className={`p-3 flex items-start gap-3 ${
+                            item.fee_missing ? 'cursor-not-allowed' : 'cursor-pointer'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={disabled}
+                            onChange={(e) => handleToggleItem(item.application_id, e.target.checked)}
+                            className="mt-1 w-4 h-4 shrink-0"
+                          />
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2 text-sm">
                               <span className="text-slate-500 tabular-nums">{item.work_date}</span>
@@ -396,26 +487,29 @@ export const DriverInvoiceCreate: React.FC<DriverInvoiceCreateProps> = ({
                           <div className="text-right tabular-nums font-semibold text-slate-900 shrink-0">
                             {item.fee_per_driver != null ? formatJPYWithSymbol(item.fee_per_driver) : '—'}
                           </div>
-                        </div>
+                        </label>
                       </li>
                     )
                   })}
                 </ul>
 
-                <div className="mt-4 ml-auto max-w-xs space-y-1.5 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-slate-600">小計</span>
-                    <span className="tabular-nums font-semibold">{formatJPY(preview.totals.subtotal_jpy)}</span>
+                {/* 集計（選択された分のみ） */}
+                {selectedTotals && (
+                  <div className="mt-4 ml-auto max-w-xs space-y-1.5 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">小計（選択した{selectedTotals.count}件）</span>
+                      <span className="tabular-nums font-semibold">{formatJPY(selectedTotals.subtotal_jpy)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">消費税 ({preview.totals.tax_rate}%)</span>
+                      <span className="tabular-nums font-semibold">{formatJPY(selectedTotals.tax_jpy)}</span>
+                    </div>
+                    <div className="flex justify-between border-t border-slate-200 pt-1.5 font-bold text-base text-slate-900">
+                      <span>合計</span>
+                      <span className="tabular-nums">{formatJPYWithSymbol(selectedTotals.total_jpy)}</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-600">消費税 ({preview.totals.tax_rate}%)</span>
-                    <span className="tabular-nums font-semibold">{formatJPY(preview.totals.tax_jpy)}</span>
-                  </div>
-                  <div className="flex justify-between border-t border-slate-200 pt-1.5 font-bold text-base text-slate-900">
-                    <span>合計</span>
-                    <span className="tabular-nums">{formatJPYWithSymbol(preview.totals.total_jpy)}</span>
-                  </div>
-                </div>
+                )}
               </>
             )}
           </section>
@@ -448,18 +542,30 @@ export const DriverInvoiceCreate: React.FC<DriverInvoiceCreateProps> = ({
               type="button"
               className="flex-1 bg-slate-900 text-white rounded-xl py-3.5 font-bold flex justify-center items-center gap-2 hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={handleSubmit}
-              disabled={!preview.can_generate || submitting || !!success}
+              disabled={
+                preview.warnings.length > 0 ||
+                selectedAppIds.size === 0 ||
+                submitting ||
+                !!success
+              }
             >
               {submitting ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
               {submitting ? '申請中...' : '申請する'}
             </button>
           </div>
 
-          {!preview.can_generate && !previewLoading && (
+          {!previewLoading && preview.warnings.length > 0 && (
             <p className="mt-3 text-xs text-slate-500 text-center">
               上記の警告をすべて解決すると申請ボタンが有効になります
             </p>
           )}
+          {!previewLoading &&
+            preview.warnings.length === 0 &&
+            selectedAppIds.size === 0 && (
+              <p className="mt-3 text-xs text-rose-600 text-center font-semibold">
+                申請する案件を1件以上選択してください
+              </p>
+            )}
         </>
       )}
     </div>
