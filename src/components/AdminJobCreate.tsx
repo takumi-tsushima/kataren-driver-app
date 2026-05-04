@@ -17,6 +17,7 @@ import {
   JapaneseYen,
 } from 'lucide-react'
 import { AREA_TAG_LABELS, type AreaTag } from '../lib/jobLocation'
+import { STORE_OPTIONS } from '../lib/storeOptions'
 import {
   format,
   parseISO,
@@ -147,16 +148,6 @@ type DriverRow = {
   email: string
   name: string | null
 }
-
-const STORE_OPTIONS = [
-  'トヨタレンタカー赤羽駅前店',
-  'トヨタレンタカー練馬駅前店',
-  'トヨタレンタカー中野坂上店',
-  'トヨタレンタカー吾妻橋店',
-  'トヨタレンタカー池袋東口店',
-  'トヨタレンタカー東京駅八重洲口店',
-  'トヨタレンタカー成田空港店',
-] as const
 
 const AREA_TAG_OPTIONS: { value: AreaTag; label: string }[] = [
   { value: 'tokyo_to_narita', label: AREA_TAG_LABELS.tokyo_to_narita },
