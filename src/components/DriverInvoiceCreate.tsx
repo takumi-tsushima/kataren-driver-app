@@ -225,6 +225,13 @@ export const DriverInvoiceCreate: React.FC<DriverInvoiceCreateProps> = ({
       if (error) throw error
       if (!invoiceId) throw new Error('invoice_id が返却されませんでした')
 
+      // Discord 通知（fire-and-forget・失敗しても申請成功扱い）
+      void supabase.functions
+        .invoke('notify-invoice-submitted', { body: { invoice_id: invoiceId } })
+        .catch((err) => {
+          console.warn('Discord notification failed (non-blocking):', err)
+        })
+
       setSuccess('請求書を申請しました。詳細画面へ移動します…')
       window.setTimeout(() => onCreated(invoiceId as string), 800)
     } catch (e) {
