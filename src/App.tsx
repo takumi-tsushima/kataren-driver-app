@@ -31,6 +31,7 @@ import { DriverInvoiceCreate } from './components/DriverInvoiceCreate'
 import { InvoiceDetail } from './components/InvoiceDetail'
 import { AdminInvoicesList } from './components/AdminInvoicesList'
 import { AdminCompletedJobsList } from './components/AdminCompletedJobsList'
+import { AppHeader } from './components/AppHeader'
 import { displayDriverName } from './lib/driverDisplay'
 
 export type PageType =
@@ -503,21 +504,11 @@ function App() {
     return (
       <div style={homePage}>
         <div className="max-w-md w-full mx-auto">
-          <header className="mb-1 flex items-center justify-between gap-3">
-            <h1 className="m-0 text-base font-bold text-slate-900">ホーム</h1>
-            <div className="flex min-w-0 items-center gap-2">
-              <span className="max-w-[140px] truncate text-xs text-slate-500">
-                {displayDriverName(driver) || userEmail}
-              </span>
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="shrink-0 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 active:bg-slate-100"
-              >
-                ログアウト
-              </button>
-            </div>
-          </header>
+          <AppHeader
+            title="ホーム"
+            userLabel={displayDriverName(driver) || userEmail}
+            onLogout={handleLogout}
+          />
 
           {refreshing && <p className="hint-text">更新中...</p>}
           {message && <p className="hint-text">{message}</p>}
