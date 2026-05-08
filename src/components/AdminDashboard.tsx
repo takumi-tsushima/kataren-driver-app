@@ -6,6 +6,7 @@ import {
     FolderOpen,
     Loader2,
     CheckCircle2,
+    Receipt,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
@@ -15,6 +16,8 @@ type AdminPageType =
     | 'admin-draft-jobs'
     | 'admin-open-jobs'
     | 'admin-confirmed-jobs'
+    | 'admin-completed-jobs'
+    | 'admin-invoices'
 
 type Props = {
     onNavigate: (page: AdminPageType) => void
@@ -103,7 +106,7 @@ export const AdminDashboard = ({ onNavigate }: Props) => {
             </div>
 
             {/* Main Navigation */}
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-5 md:gap-5">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-6 md:gap-5">
                 <button
                     onClick={() => onNavigate('admin-shift-table')}
                     className="group flex flex-col items-center justify-center gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition-all hover:-translate-y-1 hover:border-slate-300 hover:shadow-md active:scale-95 md:p-8"
@@ -162,6 +165,16 @@ export const AdminDashboard = ({ onNavigate }: Props) => {
                         <CheckCircle2 size={28} />
                     </div>
                     <span className="font-bold text-slate-700">確定案件一覧</span>
+                </button>
+
+                <button
+                    onClick={() => onNavigate('admin-invoices')}
+                    className="group flex flex-col items-center justify-center gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition-all hover:-translate-y-1 hover:border-slate-300 hover:shadow-md active:scale-95 md:p-8"
+                >
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-violet-50 text-violet-600 transition-colors group-hover:bg-violet-600 group-hover:text-white">
+                        <Receipt size={28} />
+                    </div>
+                    <span className="font-bold text-slate-700">請求書管理</span>
                 </button>
             </div>
 

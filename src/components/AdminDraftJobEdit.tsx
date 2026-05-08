@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { Calendar, MapPin, Users, Clock, FileText, Save, ChevronLeft, Repeat, ArrowRight } from 'lucide-react'
+import { Calendar, MapPin, Users, Clock, FileText, Save, Repeat, ArrowRight, JapaneseYen } from 'lucide-react'
 import { AREA_TAG_LABELS, type AreaTag } from '../lib/jobLocation'
+import { STORE_OPTIONS } from '../lib/storeOptions'
 
 type Props = {
     jobId: string
@@ -20,17 +21,8 @@ type JobRow = {
     application_deadline: string | null
     note: string | null
     status: 'draft' | 'open' | 'closed' | 'cancelled'
+    fee_per_driver: number | null
 }
-
-const STORE_OPTIONS = [
-    'トヨタレンタカー赤羽駅前店',
-    'トヨタレンタカー練馬駅前店',
-    'トヨタレンタカー中野坂上店',
-    'トヨタレンタカー吾妻橋店',
-    'トヨタレンタカー池袋東口店',
-    'トヨタレンタカー東京駅八重洲口店',
-    'トヨタレンタカー成田空港店',
-] as const
 
 const AREA_TAG_OPTIONS: { value: AreaTag; label: string }[] = [
     { value: 'tokyo_to_narita', label: AREA_TAG_LABELS.tokyo_to_narita },
@@ -55,6 +47,7 @@ export const AdminDraftJobEdit = ({ jobId, onBack }: Props) => {
     const [capacity, setCapacity] = useState(1)
     const [deadline, setDeadline] = useState('')
     const [note, setNote] = useState('')
+    const [feePerDriver, setFeePerDriver] = useState<string>('')
 
     useEffect(() => {
         const fetchJob = async () => {
@@ -65,7 +58,7 @@ export const AdminDraftJobEdit = ({ jobId, onBack }: Props) => {
             try {
                 const { data, error } = await supabase
                     .from('jobs')
-                    .select('id, work_date, location, pickup_location, dropoff_location, area_tag, group_id, capacity, application_deadline, note, status')
+                    .select('id, work_date, location, pickup_location, dropoff_location, area_tag, group_id, capacity, application_deadline, note, status, fee_per_driver')
                     .eq('id', jobId)
                     .eq('status', 'draft')
                     .single()
@@ -83,6 +76,7 @@ export const AdminDraftJobEdit = ({ jobId, onBack }: Props) => {
                 setCapacity(job.capacity ?? 1)
                 setDeadline(job.application_deadline ?? '')
                 setNote(job.note ?? '')
+                setFeePerDriver(job.fee_per_driver != null ? String(job.fee_per_driver) : '')
             } catch (e) {
                 console.error(e)
                 setMessage('下書き案件の取得に失敗しました。')
@@ -112,6 +106,18 @@ export const AdminDraftJobEdit = ({ jobId, onBack }: Props) => {
             return
         }
 
+        // 報酬：空はNULL扱い、値ありは0以上の整数のみ許容
+        let feeValue: number | null = null
+        if (feePerDriver.trim() !== '') {
+            const parsed = Number(feePerDriver)
+            if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < 0) {
+                setMessage('報酬は0以上の整数で入力してください。')
+                setMessageType('error')
+                return
+            }
+            feeValue = parsed
+        }
+
         setSaving(true)
         setMessage('')
         setMessageType('')
@@ -129,6 +135,7 @@ export const AdminDraftJobEdit = ({ jobId, onBack }: Props) => {
                     application_deadline: deadline.trim() ? deadline : null,
                     note: note.trim() ? note.trim() : null,
                     status: 'draft',
+                    fee_per_driver: feeValue,
                 })
                 .eq('id', jobId)
 
@@ -161,26 +168,16 @@ export const AdminDraftJobEdit = ({ jobId, onBack }: Props) => {
 
     return (
         <div className="w-full pb-24">
-            <div className="flex justify-between items-start gap-4 mb-5 flex-wrap">
-                <div>
-                    <h2 className="m-0 text-2xl font-bold text-slate-900">下書き案件編集</h2>
-                    <p className="mt-1.5 text-slate-600 text-sm">下書き状態の案件を編集できます。</p>
-                    {groupId && (
-                        <div className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-violet-100 px-2 py-1 text-xs font-bold text-violet-700 border border-violet-200">
-                            <Repeat size={12} />
-                            往復セット（group_id: {groupId.slice(0, 8)}…）
-                            <span className="ml-1 font-normal text-violet-600">復路は別レコードとして編集してください</span>
-                        </div>
-                    )}
-                </div>
-
-                <button
-                    className="border border-slate-300 bg-white text-slate-700 rounded-xl px-3.5 py-2.5 font-bold flex items-center gap-2 hover:bg-slate-50 transition-colors"
-                    onClick={onBack}
-                >
-                    <ChevronLeft size={18} />
-                    一覧へ戻る
-                </button>
+            <div className="mb-5">
+                <h2 className="m-0 text-2xl font-bold text-slate-900">下書き案件編集</h2>
+                <p className="mt-1.5 text-slate-600 text-sm">下書き状態の案件を編集できます。</p>
+                {groupId && (
+                    <div className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-violet-100 px-2 py-1 text-xs font-bold text-violet-700 border border-violet-200">
+                        <Repeat size={12} />
+                        往復セット（group_id: {groupId.slice(0, 8)}…）
+                        <span className="ml-1 font-normal text-violet-600">復路は別レコードとして編集してください</span>
+                    </div>
+                )}
             </div>
 
             {message && (
@@ -300,6 +297,32 @@ export const AdminDraftJobEdit = ({ jobId, onBack }: Props) => {
                                 onChange={(e) => setDeadline(e.target.value)}
                             />
                         </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                        <label className="flex items-center gap-1.5 font-bold text-slate-700 text-sm">
+                            <JapaneseYen size={16} />
+                            報酬（1名あたり・税抜）
+                            <span className="ml-auto text-[10px] font-medium text-slate-500">
+                                {groupId ? '※往路・復路はそれぞれ別レコードで設定' : ''}
+                            </span>
+                        </label>
+                        <div className="relative">
+                            <input
+                                className="w-full box-border border border-slate-300 rounded-xl p-3 pr-10 text-sm bg-white"
+                                type="number"
+                                inputMode="numeric"
+                                min={0}
+                                step={1}
+                                placeholder="例: 5000（未入力なら未設定）"
+                                value={feePerDriver}
+                                onChange={(e) => setFeePerDriver(e.target.value)}
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 font-semibold text-sm">円</span>
+                        </div>
+                        <p className="text-[11px] font-medium text-slate-500">
+                            請求書集計時に必須となります。未入力の案件は請求書に含められません。
+                        </p>
                     </div>
 
                     <div className="flex flex-col gap-2">

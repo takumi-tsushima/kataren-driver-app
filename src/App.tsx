@@ -25,12 +25,20 @@ import { DriverJobsList } from './components/DriverJobsList'
 import { DriverMyJobsList } from './components/DriverMyJobsList'
 import { AdminConfirmedJobsList } from './components/AdminConfirmedJobsList'
 import { ProfileRegister } from './components/ProfileRegister'
+import { ProfileEdit } from './components/ProfileEdit'
+import { DriverInvoicesList } from './components/DriverInvoicesList'
+import { DriverInvoiceCreate } from './components/DriverInvoiceCreate'
+import { InvoiceDetail } from './components/InvoiceDetail'
+import { AdminInvoicesList } from './components/AdminInvoicesList'
+import { AdminCompletedJobsList } from './components/AdminCompletedJobsList'
+import { AppHeader } from './components/AppHeader'
 import { displayDriverName } from './lib/driverDisplay'
 
 export type PageType =
   | 'home'
   | 'shift-submit'
   | 'login'
+  | 'profile-edit'
   | 'admin-dashboard'
   | 'admin-shift-table'
   | 'admin-job-create'
@@ -39,8 +47,14 @@ export type PageType =
   | 'admin-open-jobs'
   | 'admin-job-edit'
   | 'admin-confirmed-jobs'
+  | 'admin-completed-jobs'
+  | 'admin-invoices'
+  | 'admin-invoice-detail'
   | 'driver-jobs-list'
   | 'driver-my-jobs'
+  | 'driver-invoices-list'
+  | 'driver-invoice-create'
+  | 'driver-invoice-detail'
 
 type UserRole = 'driver' | 'admin'
 
@@ -70,6 +84,7 @@ function App() {
   const [pageName, setPageName] = useState<PageType>('home')
   const [editingJobId, setEditingJobId] = useState<string | null>(null)
   const [editingDraftJobId, setEditingDraftJobId] = useState<string | null>(null)
+  const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null)
 
   const driverRef = useRef<Driver | null>(null)
 
@@ -82,11 +97,6 @@ function App() {
   const [selectedDates, setSelectedDates] = useState<Date[]>([])
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-
-  const normalizeNullableString = (value?: string | null) => {
-    const trimmed = value?.trim()
-    return trimmed ? trimmed : null
-  }
 
   const isDateLocked = (dateStr: string) => {
     // 今日から3日後までロック（4日間）。例：今日5/1なら5/1〜5/4ロック、5/5以降編集可
@@ -102,9 +112,6 @@ function App() {
       newMap.set(s.shift_date, {
         date: s.shift_date,
         status: s.availability_status as ShiftStatus,
-        timeSlot: s.available_from_time || undefined,
-        maxJobs: s.max_jobs_per_day,
-        note: s.note || undefined,
       })
     })
     setLocalShifts(newMap)
@@ -124,12 +131,7 @@ function App() {
       } else {
         if (shift.status === 'none') {
           count++
-        } else if (
-          dbObj.availability_status !== shift.status ||
-          (dbObj.available_from_time || undefined) !== shift.timeSlot ||
-          dbObj.max_jobs_per_day !== shift.maxJobs ||
-          (dbObj.note || undefined) !== shift.note
-        ) {
+        } else if (dbObj.availability_status !== shift.status) {
           count++
         }
       }
@@ -323,12 +325,7 @@ function App() {
     })
   }
 
-  const handleApplyMultiEdit = (data: {
-    status: ShiftStatus
-    timeSlot?: string
-    maxJobs?: number
-    note?: string
-  }) => {
+  const handleApplyMultiEdit = (data: { status: ShiftStatus }) => {
     if (selectedDates.length === 0) return
 
     setLocalShifts((prevMap) => {
@@ -341,7 +338,7 @@ function App() {
 
         newMap.set(dateStr, {
           date: dateStr,
-          ...data,
+          status: data.status,
         })
       })
 
@@ -384,25 +381,17 @@ function App() {
           return
         }
 
-        const normalizedTimeSlot = normalizeNullableString(localShift.timeSlot)
-        const normalizedNote = normalizeNullableString(localShift.note)
-        const normalizedMaxJobs = localShift.maxJobs ?? 1
-
         const isChanged =
-          !dbShift ||
-          dbShift.availability_status !== localShift.status ||
-          (dbShift.available_from_time ?? null) !== normalizedTimeSlot ||
-          dbShift.max_jobs_per_day !== normalizedMaxJobs ||
-          (dbShift.note ?? null) !== normalizedNote
+          !dbShift || dbShift.availability_status !== localShift.status
 
         if (isChanged) {
           upsertPayload.push({
             driver_id: driver.id,
             shift_date: dateStr,
             availability_status: localShift.status,
-            available_from_time: normalizedTimeSlot,
-            max_jobs_per_day: normalizedMaxJobs,
-            note: normalizedNote,
+            available_from_time: null,
+            max_jobs_per_day: 1,
+            note: null,
           })
         }
       })
@@ -514,15 +503,11 @@ function App() {
     return (
       <div style={page}>
         <div className="max-w-md w-full mx-auto">
-          <header className="app-header">
-            <h1>ホーム</h1>
-            <div className="header-actions">
-              <span className="user-email">{displayDriverName(driver) || userEmail}</span>
-              <button className="logout-btn" onClick={handleLogout}>
-                ログアウト
-              </button>
-            </div>
-          </header>
+          <AppHeader
+            title="ホーム"
+            userLabel={displayDriverName(driver) || userEmail}
+            onLogout={handleLogout}
+          />
 
           {refreshing && <p className="hint-text">更新中...</p>}
           {message && <p className="hint-text">{message}</p>}
@@ -544,28 +529,36 @@ function App() {
     return (
       <div style={page}>
         <div className="max-w-md w-full mx-auto">
-          <header className="app-header">
-            <div className="header-actions" style={{ gap: 12 }}>
-              <button
-                className="logout-btn"
-                onClick={() => setPageName('home')}
-                style={{ minWidth: 'auto' }}
-              >
-                ← ホーム
-              </button>
-              <h1 style={{ margin: 0 }}>募集案件一覧</h1>
-            </div>
-
-            <div className="header-actions">
-              <span className="user-email">{displayDriverName(driver) || userEmail}</span>
-              <button className="logout-btn" onClick={handleLogout}>
-                ログアウト
-              </button>
-            </div>
-          </header>
+          <AppHeader
+            onBack={() => setPageName('home')}
+            userLabel={displayDriverName(driver) || userEmail}
+            onLogout={handleLogout}
+          />
 
           <main className="main-content" style={{ width: '100%' }}>
             <DriverJobsList onApplied={() => setPageName('driver-my-jobs')} />
+          </main>
+        </div>
+      </div>
+    )
+  }
+
+  if (pageName === 'profile-edit') {
+    return (
+      <div style={page}>
+        <div className="max-w-md w-full mx-auto">
+          <AppHeader
+            onBack={() => setPageName('home')}
+            userLabel={displayDriverName(driver) || userEmail}
+            onLogout={handleLogout}
+          />
+
+          <main className="main-content" style={{ width: '100%' }}>
+            <ProfileEdit
+              driverId={driver.id}
+              email={userEmail ?? driver.email}
+              onBack={() => setPageName('home')}
+            />
           </main>
         </div>
       </div>
@@ -576,28 +569,94 @@ function App() {
     return (
       <div style={page}>
         <div className="max-w-md w-full mx-auto">
-          <header className="app-header">
-            <div className="header-actions" style={{ gap: 12 }}>
-              <button
-                className="logout-btn"
-                onClick={() => setPageName('home')}
-                style={{ minWidth: 'auto' }}
-              >
-                ← ホーム
-              </button>
-              <h1 style={{ margin: 0 }}>自分の案件一覧</h1>
-            </div>
-
-            <div className="header-actions">
-              <span className="user-email">{displayDriverName(driver) || userEmail}</span>
-              <button className="logout-btn" onClick={handleLogout}>
-                ログアウト
-              </button>
-            </div>
-          </header>
+          <AppHeader
+            onBack={() => setPageName('home')}
+            userLabel={displayDriverName(driver) || userEmail}
+            onLogout={handleLogout}
+          />
 
           <main className="main-content" style={{ width: '100%' }}>
             <DriverMyJobsList />
+          </main>
+        </div>
+      </div>
+    )
+  }
+
+  if (pageName === 'driver-invoices-list') {
+    return (
+      <div style={page}>
+        <div className="max-w-2xl w-full mx-auto">
+          <AppHeader
+            onBack={() => setPageName('home')}
+            userLabel={displayDriverName(driver) || userEmail}
+            onLogout={handleLogout}
+          />
+
+          <main className="main-content" style={{ width: '100%' }}>
+            <DriverInvoicesList
+              driverId={driver.id}
+              onOpenInvoice={(id) => {
+                setViewingInvoiceId(id)
+                setPageName('driver-invoice-detail')
+              }}
+              onCreateInvoice={() => setPageName('driver-invoice-create')}
+            />
+          </main>
+        </div>
+      </div>
+    )
+  }
+
+  if (pageName === 'driver-invoice-create') {
+    return (
+      <div style={page}>
+        <div className="max-w-2xl w-full mx-auto">
+          <AppHeader
+            onBack={() => setPageName('driver-invoices-list')}
+            backLabel="← 一覧"
+            userLabel={displayDriverName(driver) || userEmail}
+            onLogout={handleLogout}
+          />
+
+          <main className="main-content" style={{ width: '100%' }}>
+            <DriverInvoiceCreate
+              driverId={driver.id}
+              onCancel={() => setPageName('driver-invoices-list')}
+              onCreated={(invoiceId) => {
+                setViewingInvoiceId(invoiceId)
+                setPageName('driver-invoice-detail')
+              }}
+            />
+          </main>
+        </div>
+      </div>
+    )
+  }
+
+  if (pageName === 'driver-invoice-detail' && viewingInvoiceId) {
+    return (
+      <div style={page}>
+        <div className="max-w-5xl w-full mx-auto">
+          <AppHeader
+            onBack={() => {
+              setViewingInvoiceId(null)
+              setPageName('driver-invoices-list')
+            }}
+            backLabel="← 一覧"
+            userLabel={displayDriverName(driver) || userEmail}
+            onLogout={handleLogout}
+            className="print:hidden"
+          />
+
+          <main className="main-content" style={{ width: '100%' }}>
+            <InvoiceDetail
+              invoiceId={viewingInvoiceId}
+              onBack={() => {
+                setViewingInvoiceId(null)
+                setPageName('driver-invoices-list')
+              }}
+            />
           </main>
         </div>
       </div>
@@ -608,28 +667,38 @@ function App() {
     if (driver.role !== 'admin') {
       return null
     }
+
+    const adminBack: { target: PageType; label: string } = (() => {
+      switch (pageName) {
+        case 'admin-dashboard':
+          return { target: 'home', label: '← ホーム' }
+        case 'admin-draft-job-edit':
+          return { target: 'admin-draft-jobs', label: '← 一覧' }
+        case 'admin-job-edit':
+          return { target: 'admin-open-jobs', label: '← 一覧' }
+        case 'admin-completed-jobs':
+          return { target: 'admin-confirmed-jobs', label: '← 戻る' }
+        case 'admin-invoice-detail':
+          return { target: 'admin-invoices', label: '← 一覧' }
+        default:
+          return { target: 'admin-dashboard', label: '← ダッシュボード' }
+      }
+    })()
+
     return (
       <div style={page}>
         <div className="max-w-7xl w-full mx-auto">
-          <header className="app-header">
-            <div className="header-actions">
-              <button
-                className="logout-btn"
-                onClick={() => {
-                  setEditingJobId(null)
-                  setEditingDraftJobId(null)
-                  if (pageName === 'admin-dashboard') {
-                    setPageName('home')
-                  } else {
-                    setPageName('admin-dashboard')
-                  }
-                }}
-                style={{ minWidth: 'auto' }}
-              >
-                ← {pageName === 'admin-dashboard' ? 'ホーム' : '戻る'}
-              </button>
-            </div>
-          </header>
+          <AppHeader
+            onBack={() => {
+              if (adminBack.target !== 'admin-job-edit') setEditingJobId(null)
+              if (adminBack.target !== 'admin-draft-job-edit') setEditingDraftJobId(null)
+              if (adminBack.target !== 'admin-invoice-detail') setViewingInvoiceId(null)
+              setPageName(adminBack.target)
+            }}
+            backLabel={adminBack.label}
+            userLabel={displayDriverName(driver) || userEmail}
+            onLogout={handleLogout}
+          />
 
           <main className="main-content" style={{ width: '100%' }}>
             {pageName === 'admin-dashboard' && (
@@ -686,7 +755,29 @@ function App() {
 
             {pageName === 'admin-confirmed-jobs' && (
               <AdminConfirmedJobsList
-                onBack={() => setPageName('admin-dashboard')}
+                onNavigateToCompletedJobs={() => setPageName('admin-completed-jobs')}
+              />
+            )}
+
+            {pageName === 'admin-completed-jobs' && <AdminCompletedJobsList />}
+
+            {pageName === 'admin-invoices' && (
+              <AdminInvoicesList
+                onOpenInvoice={(id) => {
+                  setViewingInvoiceId(id)
+                  setPageName('admin-invoice-detail')
+                }}
+              />
+            )}
+
+            {pageName === 'admin-invoice-detail' && viewingInvoiceId && (
+              <InvoiceDetail
+                invoiceId={viewingInvoiceId}
+                onBack={() => {
+                  setViewingInvoiceId(null)
+                  setPageName('admin-invoices')
+                }}
+                showAdminActions
               />
             )}
           </main>
@@ -698,30 +789,17 @@ function App() {
   return (
     <div style={page}>
       <div className="max-w-md w-full mx-auto pb-4">
-        <header className="app-header">
-          <div className="header-actions" style={{ gap: 12 }}>
-            <button
-              className="logout-btn"
-              onClick={() => setPageName('home')}
-              style={{ minWidth: 'auto' }}
-            >
-              ← ホーム
-            </button>
-            <h1 style={{ margin: 0 }}>シフト入力</h1>
-          </div>
-
-          <div className="header-actions">
-            <span className="user-email">{displayDriverName(driver) || userEmail}</span>
-            <button className="logout-btn" onClick={handleLogout}>
-              ログアウト
-            </button>
-          </div>
-        </header>
+        <AppHeader
+          onBack={() => setPageName('home')}
+          userLabel={displayDriverName(driver) || userEmail}
+          onLogout={handleLogout}
+        />
 
         {refreshing && <p className="hint-text">更新中...</p>}
         {message && <p className="hint-text">{message}</p>}
 
         <main className="main-content">
+          <h2 className="m-0 mb-3 self-start text-2xl font-bold text-slate-900">シフト入力</h2>
           <p className="hint-text">
             日付をタップしてシフトを登録してください。複数選択も可能です。
           </p>
@@ -761,7 +839,7 @@ function App() {
 }
 
 const page: CSSProperties = {
-  padding: '24px 24px 100px 24px',
+  padding: '10px 16px 100px 16px',
   color: '#0f172a',
   background: '#f8fafc',
   minHeight: '100vh',
